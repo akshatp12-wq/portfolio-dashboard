@@ -1,0 +1,8 @@
+#!/bin/sh
+# Blocks commits that include plaintext portfolio data. Enable with:
+#   git config core.hooksPath .githooks
+node scripts/guard.js || exit 1
+if git diff --cached --name-only | grep -Ei '(^|/)[^/]*\.csv$|denylist|\.plain\.' | grep -v '^tests/fixtures/'; then
+  echo "pre-commit: refusing to commit raw data files" >&2
+  exit 1
+fi

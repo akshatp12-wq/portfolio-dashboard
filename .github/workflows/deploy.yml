@@ -1,0 +1,30 @@
+name: deploy-pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency: { group: pages, cancel-in-progress: true }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: ${{ steps.deployment.outputs.page_url }} }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: node scripts/guard.js
+      - name: Stage site (only what the page needs)
+        run: |
+          mkdir -p site/app site/engine site/data
+          cp index.html site/
+          cp app/* site/app/
+          cp engine/* site/engine/
+          cp data/*.json site/data/ 2>/dev/null || true
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deployment
+        uses: actions/deploy-pages@v4

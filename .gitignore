@@ -1,0 +1,9 @@
+# Never commit raw broker exports, plaintext documents, or the denylist.
+*.csv
+!tests/fixtures/*.csv
+denylist*
+*.plain.*
+portfolio-backup*
+node_modules/
+.DS_Store
+__pycache__/

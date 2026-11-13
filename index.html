@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Portfolio</title>
+<link rel="stylesheet" href="app/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="title">Portfolio</span><span class="muted" id="status">Locked</span></div>
+  <nav class="tabs" aria-label="Sections">
+    <button class="tab" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="assess">Assess</button>
+    <button class="tab" data-tab="macro">Macro</button>
+    <button class="tab" data-tab="trade">Trade</button>
+    <button class="tab" data-tab="log">Log</button>
+    <button class="tab active" data-tab="data">Data</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ============ DATA ============ -->
+<section id="tab-data" class="tabpane">
+
+  <div class="card">
+    <h2>1. Unlock</h2>
+    <p class="muted">The encrypted document is fetched from this site's <code>data/portfolio.enc.json</code> and decrypted here. Nothing leaves the browser.</p>
+    <div class="row">
+      <label>Passphrase <input type="password" id="pass" autocomplete="off" placeholder="5+ random words"></label>
+      <button id="btn-unlock" class="primary">Unlock</button>
+      <button id="btn-new">Start a new empty document</button>
+    </div>
+    <p id="unlock-msg" class="muted"></p>
+  </div>
+
+  <div class="card">
+    <h2>2. Import transaction files</h2>
+    <p class="muted">Drop CSVs in the Portfolio Performance layout. Rows are parsed, scrubbed and checked here before anything is stored.</p>
+    <div id="drop" class="drop" tabindex="0">
+      <span><strong>Drop CSV files here</strong> or</span>
+      <label class="primary btn" for="files">Choose files</label>
+      <input type="file" id="files" accept=".csv" multiple hidden>
+    </div>
+    <div id="import-accounts" hidden>
+      <h3>Account mapping</h3>
+      <p class="muted">Original labels are shown only here and are never stored. Set the type; the stored label is generic.</p>
+      <div class="scroll"><table id="acct-table"><thead><tr><th>Original (not stored)</th><th>Type</th><th>Stored label</th><th>Rows</th></tr></thead><tbody></tbody></table></div>
+      <h3>Denylist (kept in memory only)</h3>
+      <p class="muted">One term per line: your name, bank and brokerage names, anything that must never appear. The import is blocked if any term survives scrubbing.</p>
+      <textarea id="denylist" rows="3" placeholder="e.g. your surname, your bank, your brokerage"></textarea>
+      <div class="row">
+        <button id="btn-scrub" class="primary">Scrub and check</button>
+        <span id="scrub-msg" class="muted"></span>
+      </div>
+      <pre id="scrub-preview" class="preview" hidden></pre>
+      <div class="row"><button id="btn-merge" hidden>Add to document</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. Document and checks</h2>
+    <div id="doc-summary" class="muted">No document loaded.</div>
+    <div class="scroll"><table id="acct-summary" hidden><thead><tr><th>Account</th><th>Type</th><th class="r">Rows</th><th>First</th><th>Last</th><th class="r">Ending cash</th><th>Holdings</th></tr></thead><tbody></tbody></table></div>
+    <ul id="issues" class="issues"></ul>
+  </div>
+
+  <div class="card">
+    <h2>4. Opening positions, opening cash, manual prices</h2>
+    <p class="muted">Opening positions were imported at zero cost. Enter total cost (tax basis) per ticker. Performance uses market value on the opening date, so these only affect gain/loss.</p>
+    <div id="opening-basis" class="grid"></div>
+    <h3>Opening cash per account</h3>
+    <p class="muted">If an account's cash goes negative, its history started with cash already there. Enter the opening balance; it is booked as a deposit the day before the first transaction.</p>
+    <div id="opening-cash" class="grid"></div>
+    <h3>Manual prices</h3>
+    <p class="muted">For delisted or unquoted tickers. One per line: <code>TICKER,yyyy-MM-dd,price</code></p>
+    <textarea id="manual-prices" rows="3"></textarea>
+    <div class="row"><button id="btn-apply-overrides" class="primary">Apply overrides</button><span class="muted" id="override-msg"></span></div>
+  </div>
+
+  <div class="card">
+    <h2>5. Statement reconciliation</h2>
+    <p class="muted">Enter balances from each statement. The diff against the ledger is shown.</p>
+    <div id="recon" class="grid"></div>
+    <div class="row"><button id="btn-recon" class="primary">Compare</button></div>
+    <div class="scroll"><table id="recon-table" hidden><thead><tr><th>Account</th><th>Item</th><th class="r">Statement</th><th class="r">Ledger</th><th class="r">Diff</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h2>6. Save to GitHub</h2>
+    <p class="muted">Re-encrypts the document and writes <code>data/portfolio.enc.json</code> through the GitHub API. The token lives in memory for this tab only.</p>
+    <div class="row">
+      <label>Owner <input id="gh-owner" placeholder="github user"></label>
+      <label>Repo <input id="gh-repo" placeholder="repo name"></label>
+      <label>Branch <input id="gh-branch" value="main"></label>
+    </div>
+    <div class="row">
+      <label>Fine-grained token (Contents: read/write, this repo only) <input type="password" id="gh-token" autocomplete="off"></label>
+    </div>
+    <div class="row">
+      <button id="btn-save" class="primary">Encrypt and save</button>
+      <button id="btn-download">Download encrypted file instead</button>
+      <button id="btn-export">Export decrypted CSV (backup)</button>
+      <button id="btn-clear" class="danger">Forget everything in this tab</button>
+    </div>
+    <p id="save-msg" class="muted"></p>
+  </div>
+</section>
+
+<!-- ============ OVERVIEW (phase 1 minimal) ============ -->
+<section id="tab-overview" class="tabpane" hidden>
+  <div class="card">
+    <h2>Overview</h2>
+    <p class="muted" id="ov-note">Unlock a document first. Prices come from <code>data/quotes/</code>, refreshed by the scheduled job; until it runs, values use manual prices only.</p>
+    <div class="row">
+      <label>Accounts <select id="ov-scope"></select></label>
+      <label>Benchmark <select id="ov-bench"></select></label>
+      <label class="chk"><input type="checkbox" id="ov-sim"> Include simulations</label>
+    </div>
+    <div class="kpis" id="ov-kpis"></div>
+    <ul class="issues" id="ov-flags"></ul>
+  </div>
+</section>
+
+<!-- ============ ASSESS ============ -->
+<section id="tab-assess" class="tabpane" hidden>
+  <div class="card">
+    <h2>Assess</h2>
+    <p class="muted">Every return is time-weighted, so deposits never move a line. Window: <strong id="as-window">—</strong></p>
+    <div class="row">
+      <label>Accounts <select id="as-scope"></select></label>
+      <label>Range <select id="as-preset"><option>1M</option><option>3M</option><option>YTD</option><option>1Y</option><option selected>3Y</option><option value="all">Since first deposit</option><option value="custom">Custom months</option></select></label>
+      <span id="as-custom" class="row" hidden><label>From <input type="month" id="as-from"></label><label>To <input type="month" id="as-to"></label></span>
+      <label>Primary benchmark <select id="as-primary"></select></label>
+      <label class="chk"><input type="checkbox" id="as-sim"> Include simulations</label>
+    </div>
+    <details>
+      <summary>Benchmarks to overlay and custom mixes</summary>
+      <div id="as-bench-list" class="chks"></div>
+      <h3>Add a mix</h3>
+      <div class="row">
+        <label>Name <input id="mix-name" placeholder="e.g. 70/30"></label>
+        <label>Weights (TICKER weight, comma or newline) <input id="mix-weights" placeholder="VTI 70, BND 30"></label>
+        <label>Rebalance <select id="mix-rebal"><option value="none">none</option><option value="monthly">monthly</option><option value="quarterly" selected>quarterly</option><option value="annual">annual</option></select></label>
+        <button id="btn-mix-add" class="primary">Add mix</button><span id="mix-msg" class="muted"></span>
+      </div>
+      <ul id="mix-list" class="plain"></ul>
+    </details>
+  </div>
+  <div class="card"><h2>Growth of $100 on the window</h2><div id="as-chart"></div><div id="as-bench-table" class="scroll"></div></div>
+  <div class="card"><h2>Risk-adjusted metrics</h2><div id="as-metrics"></div></div>
+  <div class="card"><h2>Factor exposure</h2><div id="as-factors"></div></div>
+  <div class="card"><h2>Sector exposure (look-through)</h2><div id="as-sectors"></div><h3>Overlap: top underlying names across funds and direct holdings</h3><div id="as-overlap"></div></div>
+  <div class="card"><h2>Tax lots, realized gains, wash sales</h2><p class="muted">FIFO lots. Wash-sale check looks 30 days either side of a taxable loss across <em>all</em> accounts, including IRA and HSA buys.</p><div id="as-tax"></div></div>
+  <ul id="as-flags" class="issues"></ul>
+</section>
+
+<!-- ============ MACRO ============ -->
+<section id="tab-macro" class="tabpane" hidden><div id="macro-root"></div></section>
+
+<!-- ============ TRADE ============ -->
+<section id="tab-trade" class="tabpane" hidden>
+  <div class="card">
+    <h2>Add a position</h2>
+    <p class="muted">Simulations live in the encrypted document but never touch the real ledger; toggle them on in Overview, Assess and Log. "Actually bought" appends a real transaction (flag MANUAL) and should match your broker confirmation. No free text is stored: only ticker, date, shares, price, fees, account.</p>
+    <div class="row">
+      <label>Mode <select id="tr-mode"><option value="sim">Simulation</option><option value="real">Actually bought</option></select></label>
+      <label>Side <select id="tr-side"><option>Buy</option><option>Sell</option></select></label>
+      <label>Account <select id="tr-account"></select></label>
+      <label>Ticker <input id="tr-ticker" placeholder="VOO" style="text-transform:uppercase" maxlength="10"></label>
+      <label>Date <input type="date" id="tr-date"></label>
+      <label>Shares <input id="tr-shares" inputmode="decimal"></label>
+      <label>Price <input id="tr-price" inputmode="decimal" placeholder="per share"></label>
+      <label>&nbsp;<button id="btn-tr-price" type="button">Use close on date</button></label>
+      <label>Fees <input id="tr-fees" inputmode="decimal" value="0"></label>
+      <label>Funding <select id="tr-funding"><option value="cash">From account cash</option><option value="deposit">New deposit same day</option></select></label>
+      <label id="tr-name-wrap">Simulation name <input id="tr-name" placeholder="e.g. Add 10 VOO" maxlength="40"></label>
+    </div>
+    <div class="row">
+      <button id="btn-tr-preview">Preview impact</button>
+      <button id="btn-tr-add" class="primary">Add</button>
+      <span id="tr-msg" class="muted"></span>
+    </div>
+    <div id="tr-impact"></div>
+  </div>
+  <div class="card">
+    <h2>Simulations</h2>
+    <div class="scroll"><table id="sim-table"><thead><tr><th>On</th><th>Name</th><th>Date</th><th>Side</th><th>Ticker</th><th class="r">Shares</th><th class="r">Price</th><th class="r">Fees</th><th>Account</th><th>Funding</th><th></th></tr></thead><tbody></tbody></table></div>
+    <p class="muted" id="sim-count"></p>
+  </div>
+</section>
+
+<!-- ============ LOG ============ -->
+<section id="tab-log" class="tabpane" hidden>
+  <div class="card">
+    <h2>Transaction log</h2>
+    <div class="row">
+      <label>Search <input id="log-q" placeholder="ticker, type, amount"></label>
+      <label>Account <select id="log-acct"><option value="">All</option></select></label>
+      <label>Type <select id="log-type"><option value="">All</option></select></label>
+      <label>Source <select id="log-src"><option value="">Real only</option><option value="all">Real + simulated</option><option value="sim">Simulated only</option><option value="manual">Entered in Trade tab</option></select></label>
+    </div>
+    <div class="scroll"><table id="log-table"><thead><tr><th>Date</th><th>Account</th><th>Type</th><th>Ticker</th><th class="r">Shares</th><th class="r">Amount</th><th class="r">Fees</th><th>Kind</th><th>Flags</th></tr></thead><tbody></tbody></table></div>
+    <p class="muted" id="log-count"></p>
+  </div>
+</section>
+
+</main>
+<footer class="muted">Everything on this page runs in your browser. Not investment advice.</footer>
+<script type="module" src="app/app.js"></script>
+</body>
+</html>

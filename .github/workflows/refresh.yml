@@ -1,0 +1,59 @@
+name: refresh-public-data
+on:
+  schedule:
+    - cron: '15 23 * * 1-5'   # quotes: weekdays after US close (UTC)
+    - cron: '45 13 * * 1-5'   # macro: ~7:45 Central
+    - cron: '45 17 * * 1-5'   # macro: ~11:45 Central
+    - cron: '45 23 * * 1-5'   # macro: ~17:45 Central
+    - cron: '30 6 3 * *'      # Fama-French: monthly
+  workflow_dispatch:
+    inputs:
+      job:
+        description: quotes | macro | ff | all
+        default: all
+permissions:
+  contents: write
+concurrency: { group: refresh, cancel-in-progress: false }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Decide which jobs run
+        id: pick
+        run: |
+          J="${{ github.event.inputs.job }}"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            case "${{ github.event.schedule }}" in
+              "15 23 * * 1-5") J=quotes ;;
+              "30 6 3 * *") J=ff ;;
+              *) J=macro ;;
+            esac
+          fi
+          echo "job=${J:-all}" >> "$GITHUB_OUTPUT"
+      - name: Quotes
+        if: contains(fromJSON('["quotes","all"]'), steps.pick.outputs.job)
+        env: { SCREENER_UNIVERSE_URL: ${{ vars.SCREENER_UNIVERSE_URL }} }
+        run: python jobs/refresh_quotes.py
+      - name: Macro
+        if: contains(fromJSON('["macro","all"]'), steps.pick.outputs.job)
+        env: { FRED_API_KEY: ${{ secrets.FRED_API_KEY }} }
+        run: python jobs/refresh_macro.py
+        continue-on-error: true
+      - name: Fama-French
+        if: contains(fromJSON('["ff","all"]'), steps.pick.outputs.job)
+        run: python jobs/fetch_ff.py
+        continue-on-error: true
+      - name: Guard
+        run: node scripts/guard.js
+      - name: Commit if changed
+        run: |
+          git config user.name "data-refresh[bot]"
+          git config user.email "data-refresh@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "data: refresh ${{ steps.pick.outputs.job }} $(date -u +%Y-%m-%dT%H:%MZ)"
+          git pull --rebase origin main
+          git push
