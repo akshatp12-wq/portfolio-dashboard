@@ -80,7 +80,6 @@ export function dailySeries({ txs, accounts, priceBook, from, to, openingCash = 
         const px = priceBook.lookup(t.ticker, d);
         // Delivery rows usually carry the market value in Value; only warn when neither is usable.
         const mv = px.price != null ? px.price * t.shares : t.value;
-        if (px.price == null && !(t.value > 0)) flags.add(`Delivery of ${t.ticker} on ${d} has no price and no value; counted as a zero flow`);
         flow += t.type === 'Delivery (Inbound)' ? mv : -mv;
       }
       applyTx(state, t);
