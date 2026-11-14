@@ -3,7 +3,10 @@ import { S } from './state.js';
 import { BUILT_IN_BENCHMARKS, FACTOR_PROXIES } from '../engine/benchmark.js';
 
 let index = null;
-const inflight = {};
+let inflight = {};
+
+// Drops cached quote files so the next render fetches the freshly published ones.
+export function resetQuotes() { index = null; inflight = {}; S.quotes.tickers = {}; S.quotes.asOf = null; }
 
 export async function loadQuoteIndex() {
   if (index) return index;

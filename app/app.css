@@ -71,3 +71,14 @@ input.box { width: 18px; height: 18px; min-width: 0; min-height: 0; }
 .linkbtn { background: none; border: 0; color: var(--muted, #667); text-decoration: underline; cursor: pointer; padding: 0 8px; font: inherit; }
 
 [hidden] { display: none !important; }
+
+.brand { flex-wrap: wrap; align-items: center; }
+.refresh { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
+.refresh:disabled { opacity: .6; cursor: progress; }
+.rf { display: flex; flex-direction: column; gap: 3px; min-width: 150px; font-size: 12px; }
+.rf-bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; width: 160px; }
+.rf-bar > div { height: 100%; width: 3%; background: var(--accent, #0f7a63); transition: width .6s; }
+#rf-elapsed { margin-left: 4px; font-variant-numeric: tabular-nums; }
+.rf-ask { margin: 12px 16px 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+
+tfoot tr.total td { border-top: 2px solid var(--ink); }

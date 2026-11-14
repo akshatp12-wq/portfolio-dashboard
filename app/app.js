@@ -18,6 +18,8 @@ import { ensureQuotes, neededTickers } from './quotes.js';
 import { initTrade, fillTradeScopes, renderTrade } from './trade.js';
 import { withSimulations } from '../engine/simulate.js';
 import { buildLots, unrealized } from '../engine/lots.js';
+import { initRefresh, showAsOf } from './refresh.js';
+import { resetQuotes, loadQuoteIndex } from './quotes.js';
 initAssess();
 initTrade({ changed: () => renderDocument() });
 
@@ -38,7 +40,12 @@ async function loadPublic() {
   try { S.macro = await (await fetch('data/macro.json', { cache: 'no-store' })).json(); } catch { S.macro = null; }
   try { S.ff = await (await fetch('data/ff.json', { cache: 'no-store' })).json(); } catch { S.ff = null; }
 }
-loadPublic();
+loadPublic().then(() => loadQuoteIndex()).then(showAsOf);
+initRefresh({ done: async () => {
+  resetQuotes(); await loadPublic(); await loadQuoteIndex(); showAsOf();
+  const tab = document.querySelector('.tab.active')?.dataset.tab;
+  if (tab === 'overview') await renderOverview(); else if (tab === 'assess') await renderAssess(); else if (tab === 'macro') renderMacro();
+} });
 const guess = guessRepoFromLocation();
 if (guess) { $('gh-owner').value = guess.owner; $('gh-repo').value = guess.repo; }
 
@@ -256,7 +263,7 @@ $('btn-recon').addEventListener('click', () => {
 // ---------- save ----------
 $('btn-save').addEventListener('click', async () => {
   if (!S.doc) return;
-  const owner = $('gh-owner').value.trim(), repo = $('gh-repo').value.trim(), branch = $('gh-branch').value.trim() || 'main', token = $('gh-token').value;
+  const owner = $('gh-owner').value.trim(), repo = $('gh-repo').value.trim(), branch = $('gh-branch').value.trim() || 'main', token = $('gh-token').value || S.ghToken || '';
   if (!owner || !repo || !token) { $('save-msg').textContent = 'Owner, repo and token are required.'; return; }
   try {
     validateDocument(S.doc);
@@ -300,7 +307,7 @@ function fillScopes() {
 }
 ['ov-scope', 'ov-bench', 'ov-sim'].forEach((id) => $(id).addEventListener('change', renderOverview));
 async function renderOverview() {
-  const d = S.doc; const k = $('ov-kpis'); const fl = $('ov-flags'); k.innerHTML = ''; fl.innerHTML = '';
+  const d = S.doc; const k = $('ov-kpis'); k.innerHTML = '';
   if (!d) return;
   const unquoted = await ensureQuotes(neededTickers(d));
   { // keep the benchmark list in sync with mixes added on the Assess tab
@@ -328,19 +335,21 @@ async function renderOverview() {
   kpi(`Excess vs ${esc(benchName)}`, bench.missing.length ? '—' : pct(t.total - bt.total), bench.missing.length ? `no prices for ${bench.missing.join(', ')}` : `${benchKey} ${pct(bt.total)} on the same flows`);
   kpi('Money-weighted (XIRR)', pct(x), 'secondary metric');
   kpi('Net external flows', '$' + fmt(deposits), `${series[0].date} to ${to}`);
-  const missingBasis = [...new Set(sim.transactions.filter((t) => t.kind === 'opening' && t.type === 'Delivery (Inbound)' && accounts.includes(t.account) && d.overrides.openingCostBasis[t.ticker] == null).map((t) => t.ticker))];
-  if (missingBasis.length) fl.insertAdjacentHTML('beforeend', `<li class="warn">Opening cost basis missing for ${missingBasis.join(', ')}: unrealized gains and lot terms are incomplete until you enter it on the Data tab. Returns are unaffected.</li>`);
-  flags.slice(0, 12).forEach((f) => fl.insertAdjacentHTML('beforeend', `<li>${esc(f)}</li>`));
   {
     const { lots } = buildLots(sim.transactions, { openingCostBasis: d.overrides.openingCostBasis });
     const rows = unrealized(lots, pb, to).filter((u) => accounts.includes(u.account) && u.shares > 1e-9)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
     const tb = $('ov-positions').querySelector('tbody'); tb.innerHTML = '';
+    const totV = rows.reduce((s, u) => s + (u.value || 0), 0);
+    const totC = rows.reduce((s, u) => s + (u.basisMissing ? 0 : u.cost), 0);
+    const totG = rows.reduce((s, u) => s + (u.gain == null || u.basisMissing ? 0 : u.gain), 0);
+    const share = (x, t) => (t > 0 && x != null ? pct(x / t, 1) : '—');
     for (const u of rows) {
-      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(labelOf(u.account))}</td><td>${esc(u.ticker)}</td><td class="r">${fmt(u.shares, 4)}</td><td class="r">${u.priceMissing ? '—' : fmt(u.value / u.shares)}</td><td class="r">${u.value == null ? 'no price' : '$' + fmt(u.value)}</td><td class="r">${u.basisMissing ? 'missing' : '$' + fmt(u.cost)}</td><td class="r">${u.gain == null || u.basisMissing ? '—' : fmt(u.gain)}</td></tr>`);
+      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(labelOf(u.account))}</td><td>${esc(u.ticker)}</td><td class="r">${fmt(u.shares, 4)}</td><td class="r">${u.priceMissing ? '—' : fmt(u.value / u.shares)}</td><td class="r">${u.value == null ? 'no price' : '$' + fmt(u.value)}</td><td class="r">${share(u.value, totV)}</td><td class="r">${u.basisMissing ? 'missing' : '$' + fmt(u.cost)}</td><td class="r">${u.basisMissing ? '—' : share(u.cost, totC)}</td><td class="r">${u.gain == null || u.basisMissing ? '—' : fmt(u.gain)}</td></tr>`);
     }
-    const hv = rows.reduce((s, u) => s + (u.value || 0), 0);
-    $('ov-pos-total').textContent = `${rows.length} open positions, $${fmt(hv)} in holdings. ${rows.filter((u) => u.priceMissing).length ? rows.filter((u) => u.priceMissing).length + ' without a price; run the refresh.' : ''}`;
+    $('ov-positions').querySelector('tfoot').innerHTML = rows.length ? `<tr class="total"><td colspan="4"><strong>Total (${rows.length} positions)</strong></td><td class="r"><strong>$${fmt(totV)}</strong></td><td class="r"><strong>100.0%</strong></td><td class="r"><strong>$${fmt(totC)}</strong></td><td class="r"><strong>100.0%</strong></td><td class="r"><strong>${fmt(totG)}</strong></td></tr>` : '';
+    const noPx = rows.filter((u) => u.priceMissing).length;
+    $('ov-pos-total').textContent = noPx ? `${noPx} position(s) without a price yet; they count as zero until the refresh finishes.` : '';
   }
   $('ov-note').textContent = S.quotes.asOf ? `Quotes as of ${S.quotes.asOf}.${unquoted.length ? ' No quote file for: ' + unquoted.join(', ') + '.' : ''}` : 'No quote files yet, so holdings are valued only where manual prices exist. Run the refresh workflow once.';
 }

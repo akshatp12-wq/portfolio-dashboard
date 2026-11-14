@@ -21,4 +21,22 @@ async function tx(mode, fn) {
 
 export async function rememberDevice(session) { try { await tx('readwrite', (s) => s.put({ key: session.key, salt: session.salt, iter: session.iter }, ID)); return true; } catch { return false; } }
 export async function recallDevice() { try { return (await tx('readonly', (s) => s.get(ID))) || null; } catch { return null; } }
-export async function forgetDevice() { try { await tx('readwrite', (s) => s.delete(ID)); return true; } catch { return false; } }
+export async function forgetDevice() { try { await tx('readwrite', (s) => { s.delete(ID); s.delete(TOKEN); }); return true; } catch { return false; } }
+
+// GitHub token for the refresh button and saving, encrypted with the session key (AES-GCM),
+// so the stored bytes are useless without the passphrase-derived key.
+const TOKEN = 'gh-token';
+export async function rememberToken(session, token) {
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, session.key, new TextEncoder().encode(token));
+    await tx('readwrite', (s) => s.put({ iv, ct: new Uint8Array(ct), salt: session.salt }, TOKEN)); return true;
+  } catch { return false; }
+}
+export async function recallToken(session) {
+  try {
+    const r = await tx('readonly', (s) => s.get(TOKEN)); if (!r || r.salt !== session.salt) return null;
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: r.iv }, session.key, r.ct));
+  } catch { return null; }
+}
+export async function forgetToken() { try { await tx('readwrite', (s) => s.delete(TOKEN)); return true; } catch { return false; } }
