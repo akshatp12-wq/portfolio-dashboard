@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Data commits made by the refresh job use GITHUB_TOKEN, which never triggers push workflows,
+  # so redeploy whenever a refresh finishes.
+  workflow_run:
+    workflows: [refresh-public-data]
+    types: [completed]
 permissions:
   contents: read
   pages: write
@@ -16,6 +21,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with: { ref: main }
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - run: node scripts/guard.js
@@ -26,6 +32,8 @@ jobs:
           cp app/* site/app/
           cp engine/* site/engine/
           cp data/*.json site/data/ 2>/dev/null || true
+          if [ -d data/quotes ]; then cp -r data/quotes site/data/; fi
+          echo "staged $(find site -type f | wc -l) files"
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }
       - id: deployment
