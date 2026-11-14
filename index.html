@@ -151,8 +151,15 @@
       <label class="chk"><input type="checkbox" id="ov-sim"> Include simulations</label>
     </div>
     <div class="kpis" id="ov-kpis"></div>
-    <h3>Open positions</h3>
-    <div class="scroll"><table id="ov-positions"><thead><tr><th>Account</th><th>Ticker</th><th class="r">Shares</th><th class="r">Price</th><th class="r">Market value</th><th class="r">% of value</th><th class="r">Cost basis</th><th class="r">% of cost</th><th class="r">Gain/(loss)</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
+    <div class="pos-head">
+      <h3>Open positions</h3>
+      <div class="seg" id="ov-view" role="group" aria-label="Group positions">
+        <button type="button" data-view="type">By account type</button>
+        <button type="button" data-view="security">By security</button>
+        <button type="button" data-view="detail">Detail</button>
+      </div>
+    </div>
+    <div class="scroll"><table id="ov-positions"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
     <p class="muted" id="ov-pos-total"></p>
   </div>
 </section>

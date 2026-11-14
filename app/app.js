@@ -18,6 +18,7 @@ import { ensureQuotes, neededTickers } from './quotes.js';
 import { initTrade, fillTradeScopes, renderTrade } from './trade.js';
 import { withSimulations } from '../engine/simulate.js';
 import { buildLots, unrealized } from '../engine/lots.js';
+import { groupPositions, CASH } from '../engine/positions.js';
 import { initRefresh, showAsOf } from './refresh.js';
 import { resetQuotes, loadQuoteIndex } from './quotes.js';
 initAssess();
@@ -339,19 +340,45 @@ async function renderOverview() {
     const { lots } = buildLots(sim.transactions, { openingCostBasis: d.overrides.openingCostBasis });
     const rows = unrealized(lots, pb, to).filter((u) => accounts.includes(u.account) && u.shares > 1e-9)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-    const tb = $('ov-positions').querySelector('tbody'); tb.innerHTML = '';
-    const totV = rows.reduce((s, u) => s + (u.value || 0), 0);
-    const totC = rows.reduce((s, u) => s + (u.basisMissing ? 0 : u.cost), 0);
-    const totG = rows.reduce((s, u) => s + (u.gain == null || u.basisMissing ? 0 : u.gain), 0);
-    const share = (x, t) => (t > 0 && x != null ? pct(x / t, 1) : '—');
-    for (const u of rows) {
-      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(labelOf(u.account))}</td><td>${esc(u.ticker)}</td><td class="r">${fmt(u.shares, 4)}</td><td class="r">${u.priceMissing ? '—' : fmt(u.value / u.shares)}</td><td class="r">${u.value == null ? 'no price' : '$' + fmt(u.value)}</td><td class="r">${share(u.value, totV)}</td><td class="r">${u.basisMissing ? 'missing' : '$' + fmt(u.cost)}</td><td class="r">${u.basisMissing ? '—' : share(u.cost, totC)}</td><td class="r">${u.gain == null || u.basisMissing ? '—' : fmt(u.gain)}</td></tr>`);
-    }
-    $('ov-positions').querySelector('tfoot').innerHTML = rows.length ? `<tr class="total"><td colspan="4"><strong>Total (${rows.length} positions)</strong></td><td class="r"><strong>$${fmt(totV)}</strong></td><td class="r"><strong>100.0%</strong></td><td class="r"><strong>$${fmt(totC)}</strong></td><td class="r"><strong>100.0%</strong></td><td class="r"><strong>${fmt(totG)}</strong></td></tr>` : '';
+    // cash per account, including any opening cash override, so totals match Total value
+    const st = endingState(sim.transactions.filter((t) => accounts.includes(t.account)));
+    const cashItems = accounts.map((a) => ({ account: a, ticker: CASH, shares: null, value: (st.cash[a] || 0) + (d.overrides.openingCash?.[a] || 0), cost: (st.cash[a] || 0) + (d.overrides.openingCash?.[a] || 0), basisMissing: false, priceMissing: false }))
+      .filter((c) => Math.abs(c.value) >= 0.005);
+    S.posItems = [...rows, ...cashItems];
+    renderPositions();
     const noPx = rows.filter((u) => u.priceMissing).length;
     $('ov-pos-total').textContent = noPx ? `${noPx} position(s) without a price yet; they count as zero until the refresh finishes.` : '';
   }
   $('ov-note').textContent = S.quotes.asOf ? `Quotes as of ${S.quotes.asOf}.${unquoted.length ? ' No quote file for: ' + unquoted.join(', ') + '.' : ''}` : 'No quote files yet, so holdings are valued only where manual prices exist. Run the refresh workflow once.';
+}
+
+// ---------- positions table views ----------
+let posView = 'type';
+try { posView = localStorage.getItem('pd-pos-view') || 'type'; } catch {}
+$('ov-view').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-view]'); if (!b) return;
+  posView = b.dataset.view; try { localStorage.setItem('pd-pos-view', posView); } catch {}
+  renderPositions();
+});
+function renderPositions() {
+  document.querySelectorAll('#ov-view [data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === posView));
+  const items = S.posItems || [];
+  const typeOf = (id) => S.doc.accounts.find((a) => a.id === id)?.type;
+  const { sections, total } = groupPositions(items, posView, typeOf, labelOf);
+  const first = { type: 'Holding', security: 'Security', detail: 'Holding' }[posView];
+  const second = { type: 'Account', security: 'Funds included', detail: 'Account' }[posView];
+  $('ov-positions').querySelector('thead').innerHTML = `<tr><th>${first}</th><th>${second}</th><th class="r">Shares</th><th class="r">Price</th><th class="r">Market value</th><th class="r">% of value</th><th class="r">Cost basis</th><th class="r">% of cost</th><th class="r">Gain/(loss)</th></tr>`;
+  const share = (x, t) => (t > 0 && x != null ? pct(x / t, 1) : '—');
+  const cells = (r, strong = false) => { const w = (x) => (strong ? `<strong>${x}</strong>` : x); return `<td class="r">${r.shares == null ? '' : fmt(r.shares, 4)}</td><td class="r">${r.price == null ? '' : fmt(r.price)}</td><td class="r">${w('$' + fmt(r.value))}${r.priceMissing ? ' <span class="tag">no price</span>' : ''}</td><td class="r">${w(share(r.value, total.value))}</td><td class="r">${r.basisMissing ? 'missing' : w('$' + fmt(r.cost))}</td><td class="r">${r.basisMissing ? '—' : w(share(r.cost, total.cost))}</td><td class="r">${r.gain == null ? '—' : w(fmt(r.gain))}</td>`; };
+  let html = '';
+  for (const sec of sections) {
+    if (sec.label) html += `<tr class="sec"><td colspan="9">${esc(sec.label)}</td></tr>`;
+    for (const r of sec.rows) html += `<tr><td>${esc(r.label)}</td><td class="muted">${esc(r.sub)}</td>${cells(r)}</tr>`;
+    if (sec.total) html += `<tr class="sub"><td colspan="2">${esc(sec.label)} subtotal</td>${cells(sec.total, true)}</tr>`;
+  }
+  $('ov-positions').querySelector('tbody').innerHTML = html;
+  const n = items.filter((i) => i.ticker !== CASH).length;
+  $('ov-positions').querySelector('tfoot').innerHTML = items.length ? `<tr class="total"><td colspan="2"><strong>Total (${n} positions + cash)</strong></td>${cells(total, true)}</tr>` : '';
 }
 
 // ---------- log ----------
