@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:42:43+00:00",
+"fetchedAt":"2026-11-14T06:28:46+00:00",
 "name":"Fiserv, Inc.",
 "sector":"Financials",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":63.9,
 "2026-11-12":61.5,
 "2026-11-13":63.78
-}
+},
+"dividends":{}
 }

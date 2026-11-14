@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:41:53+00:00",
+"fetchedAt":"2026-11-14T06:28:00+00:00",
 "name":"Copart, Inc.",
 "sector":"Industrials",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":32.17,
 "2026-11-12":32.0,
 "2026-11-13":31.83
-}
+},
+"dividends":{}
 }

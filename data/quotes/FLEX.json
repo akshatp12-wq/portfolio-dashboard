@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:42:44+00:00",
+"fetchedAt":"2026-11-14T06:28:47+00:00",
 "name":"Flex Ltd.",
 "sector":"Information Technology",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":78.97,
 "2026-11-12":78.12,
 "2026-11-13":74.98
-}
+},
+"dividends":{}
 }

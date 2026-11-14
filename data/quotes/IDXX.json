@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:43:18+00:00",
+"fetchedAt":"2026-11-14T06:29:23+00:00",
 "name":"IDEXX Laboratories, Inc.",
 "sector":"Health Care",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":702.59,
 "2026-11-12":698.02,
 "2026-11-13":704.23
-}
+},
+"dividends":{}
 }

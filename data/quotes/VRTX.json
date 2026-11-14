@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:46:02+00:00",
+"fetchedAt":"2026-11-14T06:32:18+00:00",
 "name":"Vertex Pharmaceuticals Incorpor",
 "sector":"Health Care",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":547.03,
 "2026-11-12":542.62,
 "2026-11-13":538.6
-}
+},
+"dividends":{}
 }

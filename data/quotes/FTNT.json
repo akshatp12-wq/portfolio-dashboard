@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:42:48+00:00",
+"fetchedAt":"2026-11-14T06:28:51+00:00",
 "name":"Fortinet, Inc.",
 "sector":"Information Technology",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":128.1,
 "2026-11-12":129.54,
 "2026-11-13":127.22
-}
+},
+"dividends":{}
 }

@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:45:15+00:00",
+"fetchedAt":"2026-11-14T06:31:28+00:00",
 "name":"Solventum Corporation",
 "sector":"Health Care",
 "close":{
@@ -1335,5 +1335,6 @@
 "2026-11-11":88.62,
 "2026-11-12":88.81,
 "2026-11-13":89.08
-}
+},
+"dividends":{}
 }

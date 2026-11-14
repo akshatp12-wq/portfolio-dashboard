@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:41:56+00:00",
+"fetchedAt":"2026-11-14T06:28:03+00:00",
 "name":"CrowdStrike Holdings, Inc.",
 "sector":"Information Technology",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":229.06,
 "2026-11-12":229.87,
 "2026-11-13":226.61
-}
+},
+"dividends":{}
 }

@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:42:04+00:00",
+"fetchedAt":"2026-11-14T06:28:11+00:00",
 "name":"Datadog, Inc.",
 "sector":"Information Technology",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":184.38,
 "2026-11-12":184.46,
 "2026-11-13":184.16
-}
+},
+"dividends":{}
 }

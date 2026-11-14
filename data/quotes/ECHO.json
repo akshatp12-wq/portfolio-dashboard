@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:42:19+00:00",
+"fetchedAt":"2026-11-14T06:28:24+00:00",
 "name":"EchoStar Corporation",
 "sector":"Communication Services",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":102.2,
 "2026-11-12":98.13,
 "2026-11-13":100.0
-}
+},
+"dividends":{}
 }

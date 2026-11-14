@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:43:47+00:00",
+"fetchedAt":"2026-11-14T06:29:54+00:00",
 "name":"Lumentum Holdings Inc.",
 "sector":"Information Technology",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":648.06,
 "2026-11-12":624.65,
 "2026-11-13":596.62
-}
+},
+"dividends":{}
 }

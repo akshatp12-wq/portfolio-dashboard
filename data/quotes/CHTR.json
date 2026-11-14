@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:41:39+00:00",
+"fetchedAt":"2026-11-14T06:27:48+00:00",
 "name":"Charter Communications, Inc.",
 "sector":"Communication Services",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":136.31,
 "2026-11-12":132.66,
 "2026-11-13":138.39
-}
+},
+"dividends":{}
 }

@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:41:03+00:00",
+"fetchedAt":"2026-11-14T06:27:15+00:00",
 "name":"Applovin Corporation",
 "sector":"Communication Services",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":404.77,
 "2026-11-12":393.68,
 "2026-11-13":409.1
-}
+},
+"dividends":{}
 }

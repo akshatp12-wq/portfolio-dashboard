@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:44:55+00:00",
+"fetchedAt":"2026-11-14T06:31:07+00:00",
 "name":"Reddit, Inc.",
 "sector":"Communication Services",
 "close":{
@@ -1341,5 +1341,6 @@
 "2026-11-11":105.66,
 "2026-11-12":99.55,
 "2026-11-13":98.45
-}
+},
+"dividends":{}
 }

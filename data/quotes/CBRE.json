@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:41:32+00:00",
+"fetchedAt":"2026-11-14T06:27:41+00:00",
 "name":"CBRE Group Inc",
 "sector":"Real Estate",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":134.58,
 "2026-11-12":132.54,
 "2026-11-13":133.12
-}
+},
+"dividends":{}
 }

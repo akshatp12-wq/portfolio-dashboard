@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:46:08+00:00",
+"fetchedAt":"2026-11-14T06:32:23+00:00",
 "name":"Vylor Inc.",
 "sector":"Consumer Staples",
 "close":{
@@ -73,5 +73,6 @@
 "2026-11-11":72.1,
 "2026-11-12":72.06,
 "2026-11-13":72.54
-}
+},
+"dividends":{}
 }

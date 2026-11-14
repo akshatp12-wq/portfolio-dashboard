@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:43:09+00:00",
+"fetchedAt":"2026-11-14T06:29:13+00:00",
 "name":"Honeywell Aerospace Inc.",
 "sector":"Industrials",
 "close":{
@@ -223,5 +223,8 @@
 "2026-11-11":169.1221,
 "2026-11-12":165.83,
 "2026-11-13":165.01
+},
+"dividends":{
+"2026-11-13":0.4
 }
 }

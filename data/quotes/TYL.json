@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:45:44+00:00",
+"fetchedAt":"2026-11-14T06:31:58+00:00",
 "name":"Tyler Technologies, Inc.",
 "sector":"Information Technology",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":425.52,
 "2026-11-12":423.59,
 "2026-11-13":424.06
-}
+},
+"dividends":{}
 }

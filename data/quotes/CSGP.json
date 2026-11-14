@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:41:57+00:00",
+"fetchedAt":"2026-11-14T06:28:04+00:00",
 "name":"CoStar Group, Inc.",
 "sector":"Real Estate",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":30.27,
 "2026-11-12":30.1,
 "2026-11-13":30.96
-}
+},
+"dividends":{}
 }

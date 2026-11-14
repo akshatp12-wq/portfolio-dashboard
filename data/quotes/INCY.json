@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:43:21+00:00",
+"fetchedAt":"2026-11-14T06:29:26+00:00",
 "name":"Incyte Corporation",
 "sector":"Health Care",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":122.27,
 "2026-11-12":121.7,
 "2026-11-13":120.97
-}
+},
+"dividends":{}
 }

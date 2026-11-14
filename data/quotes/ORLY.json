@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:44:32+00:00",
+"fetchedAt":"2026-11-14T06:30:41+00:00",
 "name":"O'Reilly Automotive, Inc.",
 "sector":"Consumer Discretionary",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":90.54,
 "2026-11-12":91.56,
 "2026-11-13":92.19
-}
+},
+"dividends":{}
 }

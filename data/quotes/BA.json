@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:41:12+00:00",
+"fetchedAt":"2026-11-14T06:27:22+00:00",
 "name":"Boeing Company (The)",
 "sector":"Industrials",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":174.54,
 "2026-11-12":171.55,
 "2026-11-13":171.5
-}
+},
+"dividends":{}
 }

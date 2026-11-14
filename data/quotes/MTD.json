@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:44:12+00:00",
+"fetchedAt":"2026-11-14T06:30:21+00:00",
 "name":"Mettler-Toledo International, I",
 "sector":"Health Care",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":1749.01,
 "2026-11-12":1730.9301,
 "2026-11-13":1738.91
-}
+},
+"dividends":{}
 }

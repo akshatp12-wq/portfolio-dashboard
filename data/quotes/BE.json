@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:41:15+00:00",
+"fetchedAt":"2026-11-14T06:27:26+00:00",
 "name":"Bloom Energy Corporation",
 "sector":"Industrials",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":209.47,
 "2026-11-12":201.93,
 "2026-11-13":191.99
-}
+},
+"dividends":{}
 }

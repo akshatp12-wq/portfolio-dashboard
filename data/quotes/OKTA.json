@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:44:29+00:00",
+"fetchedAt":"2026-11-14T06:30:39+00:00",
 "name":"Okta, Inc.",
 "sector":"Information Technology",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":182.25,
 "2026-11-12":182.54,
 "2026-11-13":182.87
-}
+},
+"dividends":{}
 }

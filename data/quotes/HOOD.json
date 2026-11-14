@@ -3,7 +3,7 @@
 "source":"yahoo",
 "adjusted":true,
 "asOf":"2026-11-13",
-"fetchedAt":"2026-11-14T05:43:09+00:00",
+"fetchedAt":"2026-11-14T06:29:14+00:00",
 "name":"Robinhood Markets, Inc.",
 "sector":"Financials",
 "close":{
@@ -2453,5 +2453,6 @@
 "2026-11-11":84.58,
 "2026-11-12":81.35,
 "2026-11-13":77.86
-}
+},
+"dividends":{}
 }
