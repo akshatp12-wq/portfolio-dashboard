@@ -16,7 +16,7 @@ KEY = os.environ.get('FRED_API_KEY', '').strip()
 # group -> [(id, label)]
 SERIES = {
     'growth': [('GDPC1', 'Real GDP'), ('RSAFS', 'Retail sales'), ('INDPRO', 'Industrial production'), ('CFNAI', 'Chicago Fed National Activity Index'),
-               ('USSLIND', 'Leading index (Philadelphia Fed)'), ('GACDISA066MSFRBPHI', 'Philly Fed manufacturing, current activity'),
+               ('USSLIND', 'Leading index (Philadelphia Fed)'), ('GACDFSA066MSFRBPHI', 'Philly Fed manufacturing, current activity'),
                ('GACDISA066MSFRBNY', 'Empire State manufacturing, current activity')],
     'labor': [('PAYEMS', 'Nonfarm payrolls'), ('UNRATE', 'Unemployment rate'), ('ICSA', 'Initial jobless claims'), ('JTSJOL', 'JOLTS job openings'),
               ('CES0500000003', 'Average hourly earnings')],
