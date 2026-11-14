@@ -18,7 +18,7 @@ import { ensureQuotes, neededTickers } from './quotes.js';
 import { initTrade, fillTradeScopes, renderTrade } from './trade.js';
 import { withSimulations } from '../engine/simulate.js';
 import { buildLots, unrealized } from '../engine/lots.js';
-import { groupPositions, CASH } from '../engine/positions.js';
+import { groupPositions, sortRows, CASH } from '../engine/positions.js';
 import { initRefresh, showAsOf } from './refresh.js';
 import { resetQuotes, loadQuoteIndex } from './quotes.js';
 initAssess();
@@ -337,14 +337,44 @@ async function renderOverview() {
   kpi('Money-weighted (XIRR)', pct(x), 'secondary metric');
   kpi('Net external flows', '$' + fmt(deposits), `${series[0].date} to ${to}`);
   {
-    const { lots } = buildLots(sim.transactions, { openingCostBasis: d.overrides.openingCostBasis });
+    const { lots } = buildLots(sim.transactions, { openingCostBasis: d.overrides.openingCostBasis, openingDates: d.overrides.openingDates || {} });
     const rows = unrealized(lots, pb, to).filter((u) => accounts.includes(u.account) && u.shares > 1e-9)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
     // cash per account, including any opening cash override, so totals match Total value
     const st = endingState(sim.transactions.filter((t) => accounts.includes(t.account)));
     const cashItems = accounts.map((a) => ({ account: a, ticker: CASH, shares: null, value: (st.cash[a] || 0) + (d.overrides.openingCash?.[a] || 0), cost: (st.cash[a] || 0) + (d.overrides.openingCash?.[a] || 0), basisMissing: false, priceMissing: false }))
       .filter((c) => Math.abs(c.value) >= 0.005);
-    S.posItems = [...rows, ...cashItems];
+    // trailing-12-month income, withheld tax and account fees per holding
+    const since = addDays(to, -365);
+    const ttm = sim.transactions.filter((t) => t.date > since && t.date <= to && accounts.includes(t.account));
+    const items = [...rows, ...cashItems].map((i) => ({ ...i, income: 0, withheld: 0, fees: 0 }));
+    const find = (a, tk) => items.find((i) => i.account === a && i.ticker === tk);
+    for (const t of ttm) {
+      if (t.type === 'Dividend' && t.ticker) { const i = find(t.account, t.ticker); if (i) { i.income += t.value; i.withheld += t.taxes || 0; } }
+      else if (t.type === 'Interest') { const i = find(t.account, t.ticker || CASH) || find(t.account, CASH); if (i) { i.income += t.value; i.withheld += t.taxes || 0; } }
+      else if (t.type === 'Fees' || t.type === 'Taxes') {
+        const amt = t.value || 0; const direct = t.ticker && find(t.account, t.ticker);
+        if (direct) { if (t.type === 'Fees') direct.fees += amt; else direct.withheld += amt; continue; }
+        const held = items.filter((i) => i.account === t.account && i.ticker !== CASH && i.value > 0);
+        const tot = held.reduce((x, i) => x + i.value, 0);
+        held.forEach((i) => { const part = tot ? amt * i.value / tot : 0; if (t.type === 'Fees') i.fees += part; else i.withheld += part; });
+      }
+    }
+    // Securities: trailing-12-month dividends per share from market data x shares held now, so a
+    // recent purchase still shows its real yield. Falls back to dividends in the ledger when the
+    // quote file has no dividend history yet. Cash: interest over the average month-end balance.
+    for (const i of items) {
+      if (i.ticker === CASH) {
+        const pts = []; for (let m = 0; m <= 12; m++) { const dt = addDays(to, -30.4 * m | 0); const stM = endingState(sim.transactions.filter((t) => t.account === i.account && t.date <= dt)); pts.push((stM.cash[i.account] || 0) + (d.overrides.openingCash?.[i.account] || 0)); }
+        const avg = pts.reduce((x, y) => x + y, 0) / pts.length;
+        i.base = avg > 0 ? avg : null;
+        continue;
+      }
+      const divs = S.quotes.tickers[i.ticker]?.dividends;
+      if (divs && i.shares) { const ps = Object.entries(divs).filter(([dt]) => dt > since && dt <= to).reduce((x, [, v]) => x + v, 0); i.income = ps * i.shares; i.incomeSource = 'market'; }
+      i.base = i.value || 0;
+    }
+    S.posItems = items.map((i) => ({ ...i, expense: (i.value || 0) * (S.fundmeta.tickers?.[i.ticker]?.expense || 0) }));
     renderPositions();
     const noPx = rows.filter((u) => u.priceMissing).length;
     $('ov-pos-total').textContent = noPx ? `${noPx} position(s) without a price yet; they count as zero until the refresh finishes.` : '';
@@ -353,8 +383,15 @@ async function renderOverview() {
 }
 
 // ---------- positions table views ----------
-let posView = 'type';
-try { posView = localStorage.getItem('pd-pos-view') || 'type'; } catch {}
+let posView = 'type', posSort = { key: null, dir: 'desc' };
+try { posView = localStorage.getItem('pd-pos-view') || 'type'; const r = localStorage.getItem('pd-tax-rate'); if (r != null) $('ov-taxrate').value = r; } catch {}
+$('ov-taxrate').addEventListener('input', () => { try { localStorage.setItem('pd-tax-rate', $('ov-taxrate').value); } catch {} renderPositions(); });
+$('ov-positions').addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-sort]'); if (!th) return;
+  const k = th.dataset.sort;
+  posSort = posSort.key === k ? { key: k, dir: posSort.dir === 'desc' ? 'asc' : 'desc' } : { key: k, dir: ['label', 'sub'].includes(k) ? 'asc' : 'desc' };
+  renderPositions();
+});
 $('ov-view').addEventListener('click', (e) => {
   const b = e.target.closest('[data-view]'); if (!b) return;
   posView = b.dataset.view; try { localStorage.setItem('pd-pos-view', posView); } catch {}
@@ -362,17 +399,29 @@ $('ov-view').addEventListener('click', (e) => {
 });
 function renderPositions() {
   document.querySelectorAll('#ov-view [data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === posView));
-  const items = S.posItems || [];
+  if (!S.doc) return;
+  const rate = Math.max(0, Math.min(100, Number($('ov-taxrate').value) || 0)) / 100;
   const typeOf = (id) => S.doc.accounts.find((a) => a.id === id)?.type;
+  // estimated tax only where income is taxed now (taxable accounts); withheld tax always counts
+  const items = (S.posItems || []).map((i) => ({ ...i, taxes: (i.withheld || 0) + (typeOf(i.account) === 'taxable' ? rate * Math.max(0, i.income || 0) : 0) }));
   const { sections, total } = groupPositions(items, posView, typeOf, labelOf);
+  if (posSort.key) sections.forEach((sec) => sortRows(sec.rows, posSort.key, posSort.dir));
   const first = { type: 'Holding', security: 'Security', detail: 'Holding' }[posView];
   const second = { type: 'Account', security: 'Funds included', detail: 'Account' }[posView];
-  $('ov-positions').querySelector('thead').innerHTML = `<tr><th>${first}</th><th>${second}</th><th class="r">Shares</th><th class="r">Price</th><th class="r">Market value</th><th class="r">% of value</th><th class="r">Cost basis</th><th class="r">% of cost</th><th class="r">Gain/(loss)</th></tr>`;
+  const cols = [['label', first], ['sub', second], ['shares', 'Shares', 'r'], ['price', 'Price', 'r'], ['value', 'Market value', 'r'], ['valuePct', '% of value', 'r'], ['cost', 'Cost basis', 'r'], ['costPct', '% of cost', 'r'], ['gain', 'Gain/(loss)', 'r'], ['gainPct', 'Gain %', 'r'], ['cagr', 'Annualized', 'r'], ['netPct', 'Net income %', 'r']];
+  const arrow = (k) => (posSort.key === k ? (posSort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  $('ov-positions').querySelector('thead').innerHTML = `<tr>${cols.map(([k, t, c]) => `<th data-sort="${k}" class="sortable${c ? ' ' + c : ''}" aria-sort="${posSort.key === k ? (posSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">${t}${arrow(k)}</th>`).join('')}</tr>`;
   const share = (x, t) => (t > 0 && x != null ? pct(x / t, 1) : '—');
-  const cells = (r, strong = false) => { const w = (x) => (strong ? `<strong>${x}</strong>` : x); return `<td class="r">${r.shares == null ? '' : fmt(r.shares, 4)}</td><td class="r">${r.price == null ? '' : fmt(r.price)}</td><td class="r">${w('$' + fmt(r.value))}${r.priceMissing ? ' <span class="tag">no price</span>' : ''}</td><td class="r">${w(share(r.value, total.value))}</td><td class="r">${r.basisMissing ? 'missing' : w('$' + fmt(r.cost))}</td><td class="r">${r.basisMissing ? '—' : w(share(r.cost, total.cost))}</td><td class="r">${r.gain == null ? '—' : w(fmt(r.gain))}</td>`; };
+  const signed = (x) => (x == null ? '—' : `<span class="${x < 0 ? 'neg' : 'pos'}">${pct(x, 1)}</span>`);
+  const cells = (r, strong = false) => {
+    const w = (x) => (strong ? `<strong>${x}</strong>` : x);
+    const ann = r.cagr != null ? signed(r.cagr) : r.gainPct != null ? '<span class="muted" title="Held under a year on a cost-weighted basis">&lt;1 yr</span>' : '—';
+    const tip = `TTM income $${fmt(r.income)} · tax $${fmt(r.taxes)} · fees $${fmt(r.fees)} · fund expenses $${fmt(r.expense)}`;
+    return `<td class="r">${r.shares == null ? '' : fmt(r.shares, 4)}</td><td class="r">${r.price == null ? '' : fmt(r.price)}</td><td class="r">${w('$' + fmt(r.value))}${r.priceMissing ? ' <span class="tag">no price</span>' : ''}</td><td class="r">${w(share(r.value, total.value))}</td><td class="r">${r.basisMissing ? 'missing' : w('$' + fmt(r.cost))}</td><td class="r">${r.basisMissing ? '—' : w(share(r.cost, total.cost))}</td><td class="r">${r.gain == null ? '—' : w(fmt(r.gain))}</td><td class="r">${signed(r.gainPct)}</td><td class="r">${ann}</td><td class="r" title="${tip}">${r.netPct == null ? '—' : pct(r.netPct, 2)}</td>`;
+  };
   let html = '';
   for (const sec of sections) {
-    if (sec.label) html += `<tr class="sec"><td colspan="9">${esc(sec.label)}</td></tr>`;
+    if (sec.label) html += `<tr class="sec"><td colspan="12">${esc(sec.label)}</td></tr>`;
     for (const r of sec.rows) html += `<tr><td>${esc(r.label)}</td><td class="muted">${esc(r.sub)}</td>${cells(r)}</tr>`;
     if (sec.total) html += `<tr class="sub"><td colspan="2">${esc(sec.label)} subtotal</td>${cells(sec.total, true)}</tr>`;
   }

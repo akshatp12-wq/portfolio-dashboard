@@ -3,7 +3,8 @@ import { sortTxs } from './ledger.js';
 import { daysBetween } from './dates.js';
 
 // openingCostBasis: {ticker: totalCost} applied to opening Delivery (Inbound) lots.
-export function buildLots(txs, { openingCostBasis = {} } = {}) {
+// openingDates: {ticker: yyyy-mm-dd} true purchase date of an opening lot (holding period, terms).
+export function buildLots(txs, { openingCostBasis = {}, openingDates = {} } = {}) {
   const lots = {};         // key account|ticker -> [{date, shares, cost, origDate, flags}]
   const realized = [];     // {date, account, ticker, shares, proceeds, cost, gain, term, holdDays, lotDate}
   const flags = [];
@@ -19,7 +20,8 @@ export function buildLots(txs, { openingCostBasis = {} } = {}) {
       } else {
         const basis = t.kind === 'opening' ? openingCostBasis[t.ticker] : t.value;
         if (t.kind === 'opening' && basis == null) flags.push(`Opening lot ${t.ticker} in ${t.account} has no cost basis; gain/loss will be overstated`);
-        lots[k].push({ date: t.date, shares: t.shares, cost: basis ?? 0, origDate: t.date, kind: t.kind, basisMissing: t.kind === 'opening' && basis == null });
+        const since = (t.kind === 'opening' && openingDates[t.ticker]) || t.date;
+        lots[k].push({ date: since, shares: t.shares, cost: basis ?? 0, origDate: since, kind: t.kind, basisMissing: t.kind === 'opening' && basis == null });
       }
     } else if (t.type === 'Sell' || t.type === 'Delivery (Outbound)') {
       let remaining = t.shares;
@@ -66,8 +68,10 @@ export function unrealized(lots, priceBook, date) {
     if (!arr.length) continue;
     const [account, ticker] = k.split('|');
     const shares = arr.reduce((s, l) => s + l.shares, 0), cost = arr.reduce((s, l) => s + l.cost, 0);
+    // cost-weighted holding days over lots with a known basis, for an annualized return
+    const costDays = arr.reduce((s, l) => s + (l.basisMissing ? 0 : l.cost * Math.max(0, daysBetween(l.origDate, date))), 0);
     const px = priceBook.lookup(ticker, date).price;
-    out.push({ account, ticker, shares, cost, value: px == null ? null : px * shares, gain: px == null ? null : px * shares - cost, basisMissing: arr.some((l) => l.basisMissing), priceMissing: px == null });
+    out.push({ account, ticker, shares, cost, costDays, value: px == null ? null : px * shares, gain: px == null ? null : px * shares - cost, basisMissing: arr.some((l) => l.basisMissing), priceMissing: px == null });
   }
   return out;
 }

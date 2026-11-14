@@ -158,9 +158,11 @@
         <button type="button" data-view="security">By security</button>
         <button type="button" data-view="detail">Detail</button>
       </div>
+      <label class="inline">Tax on taxable-account income <input id="ov-taxrate" inputmode="decimal" value="15" size="3">%</label>
     </div>
     <div class="scroll"><table id="ov-positions"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
     <p class="muted" id="ov-pos-total"></p>
+    <p class="muted small">Gain % is on cost basis, price only. Annualized is the gain compounded over the cost-weighted holding period (shown once that is at least a year). Net income % is trailing-12-month dividends and interest, minus tax at the rate above for taxable accounts, account fees (split by value) and fund expense ratios, divided by market value. Click a column to sort.</p>
   </div>
 </section>
 

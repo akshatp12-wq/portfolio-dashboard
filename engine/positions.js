@@ -24,11 +24,28 @@ function merge(label, items, sub = '') {
   const basisMissing = items.some((i) => i.basisMissing);
   const cost = items.reduce((s, i) => s + (i.basisMissing ? 0 : i.cost), 0);
   const shares = single ? items.reduce((s, i) => s + i.shares, 0) : null;
+  const sum = (f) => items.reduce((s, i) => s + (i[f] || 0), 0);
+  const isCash = tickers.length === 1 && tickers[0] === CASH;
+  // Invested (non-cash) part drives gain %, which must exclude cash rows in mixed groups.
+  const inv = items.filter((i) => i.ticker !== CASH && !i.basisMissing);
+  const invValue = inv.reduce((s, i) => s + (i.value || 0), 0), invCost = inv.reduce((s, i) => s + i.cost, 0);
+  const costDays = inv.reduce((s, i) => s + (i.costDays || 0), 0);
+  const years = invCost > 0 ? costDays / invCost / 365.25 : 0;
+  const gainPct = !isCash && invCost > 0 ? invValue / invCost - 1 : null;
+  // Annualized over the cost-weighted holding period. Under a year, annualizing exaggerates,
+  // so the plain gain % is reported and flagged instead.
+  const cagr = gainPct == null ? null : years >= 1 ? Math.pow(invValue / invCost, 1 / years) - 1 : null;
+  const income = sum('income'), taxes = sum('taxes'), fees = sum('fees'), expense = sum('expense');
+  const net = income - taxes - fees - expense;
   return {
     label, sub, tickers, shares, value, cost, basisMissing,
     priceMissing: items.some((i) => i.priceMissing),
     price: single && shares ? value / shares : null,
     gain: basisMissing ? null : value - cost,
+    gainPct, cagr, years,
+    income, taxes, fees, expense, net,
+    // yield base: market value for securities, average balance for cash (items may set .base)
+    netPct: (() => { const b = items.reduce((x, i) => x + (i.base === undefined ? (i.value || 0) : (i.base || 0)), 0); return b > 0 ? net / b : null; })(),
     accounts: [...new Set(items.map((i) => i.account))].length
   };
 }
@@ -65,4 +82,19 @@ export function groupPositions(items, mode, typeOf, labelOf = (a) => a) {
   // detail: one row per account and ticker
   const rows = items.map((i) => merge(i.ticker === CASH ? 'Cash' : i.ticker, [i], labelOf(i.account))).sort(byValue);
   return { sections: [{ label: null, rows, total: null }], total: merge('Total', items) };
+}
+
+// Sorts rows in place by a column key; text columns sort A-Z, numbers high-to-low first.
+export const SORT_KEYS = { label: 'text', sub: 'text', shares: 'num', price: 'num', value: 'num', valuePct: 'num', cost: 'num', costPct: 'num', gain: 'num', gainPct: 'num', cagr: 'num', netPct: 'num' };
+export function sortRows(rows, key, dir) {
+  const k = key === 'valuePct' ? 'value' : key === 'costPct' ? 'cost' : key;
+  const text = SORT_KEYS[key] === 'text';
+  const sign = dir === 'asc' ? 1 : -1;
+  return rows.sort((a, b) => {
+    const x = a[k], y = b[k];
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;            // blanks always last
+    if (y == null) return -1;
+    return sign * (text ? String(x).localeCompare(String(y)) : x - y);
+  });
 }

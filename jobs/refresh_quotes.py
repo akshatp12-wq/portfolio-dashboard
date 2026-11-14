@@ -49,7 +49,11 @@ def yahoo(symbol, since):
         close[d] = round(c, 4)
         adjclose[d] = round(a if a is not None else c, 4)
     name = res.get('meta', {}).get('shortName') or res.get('meta', {}).get('longName') or ''
-    return {'source': 'yahoo', 'adjusted': True, 'name': name, 'close': close, 'adjClose': adjclose}
+    divs = {}
+    for ev in (res.get('events', {}) or {}).get('dividends', {}).values():
+        if ev.get('amount') is not None and ev.get('date') is not None:
+            divs[datetime.fromtimestamp(ev['date'], tz=timezone.utc).strftime('%Y-%m-%d')] = round(float(ev['amount']), 6)
+    return {'source': 'yahoo', 'adjusted': True, 'name': name, 'close': close, 'adjClose': adjclose, 'dividends': dict(sorted(divs.items()))}
 
 
 def stooq(symbol, since):
@@ -102,7 +106,7 @@ def main():
             continue
         last = max(data['close'])
         obj = {'ticker': sym, 'source': data['source'], 'adjusted': data['adjusted'], 'asOf': last, 'fetchedAt': now_iso(),
-               'name': data['name'] or names.get(sym, ''), 'sector': sectors.get(sym, ''), 'close': data['close'], 'adjClose': data['adjClose']}
+               'name': data['name'] or names.get(sym, ''), 'sector': sectors.get(sym, ''), 'close': data['close'], 'adjClose': data['adjClose'], 'dividends': data.get('dividends', {})}
         write_json(os.path.join(QDIR, f'{sym}.json'), obj, pretty_lines=True)
         ok.append(sym)
         if (i + 1) % 50 == 0:

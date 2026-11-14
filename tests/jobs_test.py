@@ -10,10 +10,12 @@ def check(name, cond):
 
 # ---- quotes: yahoo parse
 yahoo_payload = {'chart': {'result': [{'meta': {'shortName': 'Test ETF'}, 'timestamp': [1704153600, 1704240000, 1704326400],
+    'events': {'dividends': {'1704240000': {'amount': 1.5432, 'date': 1704240000}}},
     'indicators': {'quote': [{'close': [100.0, None, 102.5]}], 'adjclose': [{'adjclose': [99.0, None, 101.4]}]}}]}}
 refresh_quotes.get_json = lambda url, **k: yahoo_payload
 q = refresh_quotes.yahoo('TEST', '2024-01-01')
 check('yahoo: skips null, keeps both fields', q['close'] == {'2024-01-02': 100.0, '2024-01-04': 102.5} and q['adjClose']['2024-01-04'] == 101.4 and q['adjusted'])
+check('yahoo: dividends kept by ex-date', q['dividends'] == {'2024-01-03': 1.5432})
 # ---- quotes: stooq parse
 refresh_quotes.get = lambda url, **k: b'Date,Open,High,Low,Close,Volume\n2021-12-31,1,1,1,90,1\n2024-01-02,1,1,1,100,1\n2024-01-03,1,1,1,N/D,1\n'
 s = refresh_quotes.stooq('TEST', '2022-01-01')

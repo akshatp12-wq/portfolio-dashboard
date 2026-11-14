@@ -138,7 +138,7 @@ export async function renderAssess() {
 
   // ---- lots, gains, wash sales
   const taxable = d.accounts.filter((a) => a.type === 'taxable' && accounts.includes(a.id)).map((a) => a.id);
-  const { realized, flags, lots } = buildLots(txs, { openingCostBasis: d.overrides.openingCostBasis });
+  const { realized, flags, lots } = buildLots(txs, { openingCostBasis: d.overrides.openingCostBasis, openingDates: d.overrides.openingDates || {} });
   const ws = detectWashSales(realized, txs);
   const sum = summarizeRealized(ws, { from, to: until, accounts: taxable });
   const unr = unrealized(lots, pb, to).filter((u) => accounts.includes(u.account));

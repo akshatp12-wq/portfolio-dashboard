@@ -7,7 +7,7 @@ export function emptyDocument() {
     version: DOC_VERSION,
     accounts: [],          // [{id, type, label}]
     transactions: [],      // scrubbed rows
-    overrides: { openingCostBasis: {}, openingCash: {}, manualPrices: {} },
+    overrides: { openingCostBasis: {}, openingDates: {}, openingCash: {}, manualPrices: {} },
     simulations: [],
     savedViews: [],
     benchmarkMixes: [],

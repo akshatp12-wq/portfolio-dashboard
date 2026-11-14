@@ -91,3 +91,10 @@ tfoot tr.total td { border-top: 2px solid var(--ink); }
 .seg button.on { background: var(--ink); color: var(--bg); }
 tr.sec td { padding-top: 14px; font-weight: 600; border-bottom: 1px solid var(--line); }
 tr.sub td { border-top: 1px solid var(--line); }
+
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--ink); }
+.neg { color: var(--err, #b4532a); } .pos { color: inherit; }
+label.inline { flex-direction: row; align-items: center; gap: 6px; }
+label.inline input { min-width: 0; width: 56px; min-height: 36px; }
+p.small { font-size: 12px; }
