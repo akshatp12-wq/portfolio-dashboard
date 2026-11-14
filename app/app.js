@@ -17,6 +17,7 @@ import { renderMacro } from './macro.js';
 import { ensureQuotes, neededTickers } from './quotes.js';
 import { initTrade, fillTradeScopes, renderTrade } from './trade.js';
 import { withSimulations } from '../engine/simulate.js';
+import { buildLots, unrealized } from '../engine/lots.js';
 initAssess();
 initTrade({ changed: () => renderDocument() });
 
@@ -330,6 +331,17 @@ async function renderOverview() {
   const missingBasis = [...new Set(sim.transactions.filter((t) => t.kind === 'opening' && t.type === 'Delivery (Inbound)' && accounts.includes(t.account) && d.overrides.openingCostBasis[t.ticker] == null).map((t) => t.ticker))];
   if (missingBasis.length) fl.insertAdjacentHTML('beforeend', `<li class="warn">Opening cost basis missing for ${missingBasis.join(', ')}: unrealized gains and lot terms are incomplete until you enter it on the Data tab. Returns are unaffected.</li>`);
   flags.slice(0, 12).forEach((f) => fl.insertAdjacentHTML('beforeend', `<li>${esc(f)}</li>`));
+  {
+    const { lots } = buildLots(sim.transactions, { openingCostBasis: d.overrides.openingCostBasis });
+    const rows = unrealized(lots, pb, to).filter((u) => accounts.includes(u.account) && u.shares > 1e-9)
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    const tb = $('ov-positions').querySelector('tbody'); tb.innerHTML = '';
+    for (const u of rows) {
+      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(labelOf(u.account))}</td><td>${esc(u.ticker)}</td><td class="r">${fmt(u.shares, 4)}</td><td class="r">${u.priceMissing ? '—' : fmt(u.value / u.shares)}</td><td class="r">${u.value == null ? 'no price' : '$' + fmt(u.value)}</td><td class="r">${u.basisMissing ? 'missing' : '$' + fmt(u.cost)}</td><td class="r">${u.gain == null || u.basisMissing ? '—' : fmt(u.gain)}</td></tr>`);
+    }
+    const hv = rows.reduce((s, u) => s + (u.value || 0), 0);
+    $('ov-pos-total').textContent = `${rows.length} open positions, $${fmt(hv)} in holdings. ${rows.filter((u) => u.priceMissing).length ? rows.filter((u) => u.priceMissing).length + ' without a price; run the refresh.' : ''}`;
+  }
   $('ov-note').textContent = S.quotes.asOf ? `Quotes as of ${S.quotes.asOf}.${unquoted.length ? ' No quote file for: ' + unquoted.join(', ') + '.' : ''}` : 'No quote files yet, so holdings are valued only where manual prices exist. Run the refresh workflow once.';
 }
 
