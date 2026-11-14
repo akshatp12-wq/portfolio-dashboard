@@ -10,36 +10,51 @@
 <link rel="stylesheet" href="app/app.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand"><span class="title">Portfolio</span><span class="muted" id="status">Locked</span></div>
+<header class="top" id="topbar" hidden>
+  <div class="brand"><span class="title">Portfolio</span><span class="muted" id="status">Locked</span><button id="btn-lock" class="linkbtn" type="button">Lock</button></div>
   <nav class="tabs" aria-label="Sections">
-    <button class="tab" data-tab="overview">Overview</button>
+    <button class="tab active" data-tab="overview">Overview</button>
     <button class="tab" data-tab="assess">Assess</button>
     <button class="tab" data-tab="macro">Macro</button>
     <button class="tab" data-tab="trade">Trade</button>
     <button class="tab" data-tab="log">Log</button>
-    <button class="tab active" data-tab="data">Data</button>
+    <button class="tab" data-tab="data">Data</button>
   </nav>
 </header>
 
-<main>
+<div id="lock" class="lock" hidden>
+  <form class="lock-card" id="lock-form" autocomplete="off">
+    <h1>Portfolio</h1>
+    <p class="muted">Encrypted. Decrypted only in this browser.</p>
+    <label>Passphrase <input type="password" id="pass" autocomplete="current-password" autofocus></label>
+    <label class="chk"><input type="checkbox" id="remember"> Remember this device</label>
+    <button id="btn-unlock" class="primary" type="submit">Unlock</button>
+    <p id="unlock-msg" class="muted" role="status"></p>
+    <div id="lock-new" hidden>
+      <p class="muted">No document is published yet. You can start an empty one here (it needs a strong passphrase), then import files on the Data tab.</p>
+      <button id="btn-new" type="button">Start a new empty document</button>
+    </div>
+  </form>
+</div>
+
+<main id="app" hidden>
 
 <!-- ============ DATA ============ -->
-<section id="tab-data" class="tabpane">
+<section id="tab-data" class="tabpane" hidden>
 
   <div class="card">
-    <h2>1. Unlock</h2>
-    <p class="muted">The encrypted document is fetched from this site's <code>data/portfolio.enc.json</code> and decrypted here. Nothing leaves the browser.</p>
+    <h2>This device</h2>
+    <p class="muted" id="device-state">Not remembered on this device.</p>
     <div class="row">
-      <label>Passphrase <input type="password" id="pass" autocomplete="off" placeholder="5+ random words"></label>
-      <button id="btn-unlock" class="primary">Unlock</button>
-      <button id="btn-new">Start a new empty document</button>
+      <button id="btn-forget" type="button">Forget this device</button>
+      <label>New passphrase <input type="password" id="new-pass" autocomplete="new-password" placeholder="5+ random words or 20+ characters"></label>
+      <button id="btn-change-pass" type="button">Change passphrase</button>
     </div>
-    <p id="unlock-msg" class="muted"></p>
+    <p class="muted" id="device-msg"></p>
   </div>
 
   <div class="card">
-    <h2>2. Import transaction files</h2>
+    <h2>Import transaction files</h2>
     <p class="muted">Drop CSVs in the Portfolio Performance layout. Rows are parsed, scrubbed and checked here before anything is stored.</p>
     <div id="drop" class="drop" tabindex="0">
       <span><strong>Drop CSV files here</strong> or</span>
@@ -63,14 +78,14 @@
   </div>
 
   <div class="card">
-    <h2>3. Document and checks</h2>
+    <h2>Document and checks</h2>
     <div id="doc-summary" class="muted">No document loaded.</div>
     <div class="scroll"><table id="acct-summary" hidden><thead><tr><th>Account</th><th>Type</th><th class="r">Rows</th><th>First</th><th>Last</th><th class="r">Ending cash</th><th>Holdings</th></tr></thead><tbody></tbody></table></div>
     <ul id="issues" class="issues"></ul>
   </div>
 
   <div class="card">
-    <h2>4. Opening positions, opening cash, manual prices</h2>
+    <h2>Opening positions, opening cash, manual prices</h2>
     <p class="muted">Opening positions were imported at zero cost. Enter total cost (tax basis) per ticker. Performance uses market value on the opening date, so these only affect gain/loss.</p>
     <div id="opening-basis" class="grid"></div>
     <h3>Opening cash per account</h3>
@@ -83,7 +98,7 @@
   </div>
 
   <div class="card">
-    <h2>5. Statement reconciliation</h2>
+    <h2>Statement reconciliation</h2>
     <p class="muted">Enter balances from each statement. The diff against the ledger is shown.</p>
     <div id="recon" class="grid"></div>
     <div class="row"><button id="btn-recon" class="primary">Compare</button></div>
@@ -91,7 +106,7 @@
   </div>
 
   <div class="card">
-    <h2>6. Save to GitHub</h2>
+    <h2>Save to GitHub</h2>
     <p class="muted">Re-encrypts the document and writes <code>data/portfolio.enc.json</code> through the GitHub API. The token lives in memory for this tab only.</p>
     <div class="row">
       <label>Owner <input id="gh-owner" placeholder="github user"></label>
@@ -112,7 +127,7 @@
 </section>
 
 <!-- ============ OVERVIEW (phase 1 minimal) ============ -->
-<section id="tab-overview" class="tabpane" hidden>
+<section id="tab-overview" class="tabpane">
   <div class="card">
     <h2>Overview</h2>
     <p class="muted" id="ov-note">Unlock a document first. Prices come from <code>data/quotes/</code>, refreshed by the scheduled job; until it runs, values use manual prices only.</p>

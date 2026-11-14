@@ -12,7 +12,7 @@ export function passphraseStrength(p) {
   return { ok, words: words.length, chars: p.length, reason: ok ? '' : 'Use at least 5 random words or 20+ characters. There is no recovery.' };
 }
 
-async function deriveKey(passphrase, salt, iter) {
+export async function deriveKey(passphrase, salt, iter) {
   const base = await subtle.importKey('raw', enc.encode(passphrase.normalize('NFKC')), 'PBKDF2', false, ['deriveKey']);
   return subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
@@ -39,3 +39,32 @@ function b64(bytes) {
   return btoa(s);
 }
 function unb64(s) { return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); }
+
+// ---- key-based API (remember-me) ----
+// A non-extractable CryptoKey can be kept in IndexedDB so a trusted device skips the passphrase.
+// The salt stays stable across saves, so a remembered key keeps working until the passphrase
+// changes. Every save still uses a fresh random 96-bit IV.
+
+export async function unlockWithPassphrase(envelope, passphrase) {
+  if (envelope?.v !== 1) throw new Error('Unsupported envelope version');
+  const key = await deriveKey(passphrase, unb64(envelope.salt), envelope.iter);
+  return { key, doc: await decryptWithKey(envelope, key), salt: envelope.salt, iter: envelope.iter };
+}
+
+export async function decryptWithKey(envelope, key) {
+  let pt;
+  try { pt = await subtle.decrypt({ name: 'AES-GCM', iv: unb64(envelope.iv) }, key, unb64(envelope.ct)); }
+  catch { throw new Error('Wrong passphrase or corrupted file'); }
+  return JSON.parse(dec.decode(pt));
+}
+
+export async function newSession(passphrase, iter = ITERATIONS) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return { key: await deriveKey(passphrase, salt, iter), salt: b64(salt), iter };
+}
+
+export async function encryptWithKey(obj, session) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await subtle.encrypt({ name: 'AES-GCM', iv }, session.key, enc.encode(JSON.stringify(obj)));
+  return { v: 1, kdf: 'PBKDF2-SHA256', cipher: 'AES-256-GCM', iter: session.iter, salt: session.salt, iv: b64(iv), ct: b64(new Uint8Array(ct)) };
+}

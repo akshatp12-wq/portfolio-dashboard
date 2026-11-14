@@ -1,5 +1,5 @@
 // Shared in-memory state and small helpers. Nothing here persists.
-export const S = { doc: null, pass: '', sha: null, rawRows: [], rawByFile: {}, pending: null, quotes: { tickers: {} }, fundmeta: { tickers: {} }, macro: null, ff: null };
+export const S = { doc: null, session: null, sha: null, rawRows: [], rawByFile: {}, pending: null, quotes: { tickers: {} }, fundmeta: { tickers: {} }, macro: null, ff: null };
 export const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 2) => (n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }));
 export const pct = (n, d = 2) => (n == null || !Number.isFinite(n) ? '—' : (n * 100).toFixed(d) + '%');

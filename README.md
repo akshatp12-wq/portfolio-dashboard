@@ -18,8 +18,28 @@ All portfolio math runs in the browser. GitHub Actions only refresh public data.
   ledger with a MANUAL flag). Only ticker, date, shares, price, fees, account and a short
   name are stored.
 - **Log**: every transaction, filterable by account, type and source (real, simulated, manual).
-- **Data**: unlock, import, scrub, merge, opening basis and cash, manual prices,
+- **Data**: device and passphrase, import, scrub, merge, opening basis and cash, manual prices,
   statement reconciliation, encrypt and save to GitHub.
+
+The site opens on a lock screen. After unlocking it lands on Overview.
+
+## Remember this device
+
+Ticking "Remember this device" stores a non-extractable AES key (not the passphrase) in this
+browser's IndexedDB, so the next visit opens without typing. "Forget this device" on the Data tab
+deletes it, and "Lock" skips auto-unlock once. Anyone who can use that browser profile can open the
+data, so use it only on devices you control. The key stays valid across saves because the salt is
+stable; changing the passphrase makes a new salt and every device asks once.
+
+## Building the document from files
+
+`scripts/build_document.mjs` parses Portfolio Performance CSVs, scrubs them with the same engine the
+browser uses, runs the denylist and account-number scans, and writes only the encrypted envelope:
+
+    PD_PASSPHRASE='...' node scripts/build_document.mjs --out data/portfolio.enc.json a.csv b.csv
+
+Add later files with `--merge data/portfolio.enc.json --map "Original label=taxable_b"`. The original
+account labels are used to group rows and are never written out.
 
 Scheduled jobs (`.github/workflows/refresh.yml`) refresh quotes after the close on
 weekdays, macro three times a day, and Fama-French monthly. They need a `FRED_API_KEY`

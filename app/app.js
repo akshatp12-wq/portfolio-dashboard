@@ -1,7 +1,8 @@
 import { parsePortfolioPerformanceCsv } from '../engine/parse.js';
 import { buildAccountMap, scrubRows, accountsFromMap, findDenylisted, findAccountNumberLike, ACCOUNT_TYPES } from '../engine/scrub.js';
 import { emptyDocument, validateDocument, mergeImport } from '../engine/document.js';
-import { encryptDocument, decryptDocument, passphraseStrength } from '../engine/crypto.js';
+import { encryptWithKey, unlockWithPassphrase, decryptWithKey, newSession, passphraseStrength } from '../engine/crypto.js';
+import { rememberDevice, recallDevice, forgetDevice } from './device.js';
 import { putRepoFile, getRepoFile, guessRepoFromLocation } from '../engine/github.js';
 import { checkLedger, endingState, dailySeries, sortTxs } from '../engine/ledger.js';
 import { twr, xirrFromSeries } from '../engine/returns.js';
@@ -41,28 +42,81 @@ const guess = guessRepoFromLocation();
 if (guess) { $('gh-owner').value = guess.owner; $('gh-repo').value = guess.repo; }
 
 // ---------- unlock ----------
-$('btn-unlock').addEventListener('click', async () => {
-  const pass = $('pass').value;
-  $('unlock-msg').textContent = 'Fetching and decrypting…';
+function enter(doc, session, label) {
+  S.doc = doc; S.session = session;
+  validateDocument(S.doc);
+  $('lock').hidden = true; $('topbar').hidden = false; $('app').hidden = false;
+  $('status').textContent = label;
+  $('pass').value = '';
+  renderDocument(); renderOverview(); refreshDeviceState();
+}
+
+async function fetchEnvelope() {
+  const res = await fetch('data/portfolio.enc.json', { cache: 'no-store' });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Could not load the document (${res.status}).`);
+  return res.json();
+}
+
+$('lock-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pass = $('pass').value; if (!pass) return;
+  const msg = $('unlock-msg'); msg.textContent = 'Decrypting…'; $('btn-unlock').disabled = true;
   try {
-    const res = await fetch('data/portfolio.enc.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('No encrypted document found on this site yet. Import files and save, or start a new document.');
-    const env = await res.json();
-    S.doc = await decryptDocument(env, pass);
-    validateDocument(S.doc);
-    S.pass = pass;
-    $('status').textContent = 'Unlocked';
-    $('unlock-msg').textContent = `Loaded ${S.doc.transactions.length} transactions across ${S.doc.accounts.length} accounts.`;
-    renderDocument();
-  } catch (e) { $('unlock-msg').textContent = e.message; }
+    const env = await fetchEnvelope();
+    if (!env) { msg.textContent = 'No document is published yet.'; $('lock-new').hidden = false; return; }
+    const { doc, key, salt, iter } = await unlockWithPassphrase(env, pass);
+    const session = { key, salt, iter }; S.loadedIv = env.iv;
+    if ($('remember').checked) await rememberDevice(session); else await forgetDevice();
+    enter(doc, session, 'Unlocked');
+  } catch (err) { msg.textContent = err.message; }
+  finally { $('btn-unlock').disabled = false; }
 });
-$('btn-new').addEventListener('click', () => {
+
+$('btn-new').addEventListener('click', async () => {
   const pass = $('pass').value, st = passphraseStrength(pass);
   if (!st.ok) { $('unlock-msg').textContent = st.reason; return; }
-  S.doc = emptyDocument(); S.pass = pass; S.sha = null;
-  $('status').textContent = 'Unlocked (new)'; $('unlock-msg').textContent = 'New empty document. Import files below.';
-  renderDocument();
+  $('unlock-msg').textContent = 'Deriving key…';
+  const session = await newSession(pass);
+  S.sha = null;
+  if ($('remember').checked) await rememberDevice(session);
+  enter(emptyDocument(), session, 'Unlocked (new)');
+  document.querySelector('[data-tab="data"]').click();
 });
+
+$('btn-lock').addEventListener('click', () => { try { sessionStorage.setItem('pd-skip-auto', '1'); } catch {} location.reload(); });
+
+async function refreshDeviceState() {
+  const rec = await recallDevice();
+  $('device-state').textContent = rec ? 'This device is remembered: it opens without the passphrase until you forget it.' : 'Not remembered on this device. You will type the passphrase each visit.';
+}
+$('btn-forget').addEventListener('click', async () => { await forgetDevice(); $('device-msg').textContent = 'Forgotten. The next visit asks for the passphrase.'; refreshDeviceState(); });
+$('btn-change-pass').addEventListener('click', async () => {
+  if (!S.doc) return;
+  const np = $('new-pass').value, st = passphraseStrength(np);
+  if (!st.ok) { $('device-msg').textContent = st.reason; return; }
+  $('device-msg').textContent = 'Deriving key…';
+  S.session = await newSession(np); $('new-pass').value = '';
+  await forgetDevice(); refreshDeviceState();
+  $('device-msg').textContent = 'New passphrase applied in this tab. Save to GitHub to publish it; other remembered devices will ask for it once.';
+});
+
+// Auto-unlock a remembered device (skipped right after pressing Lock). The lock screen is shown
+// only once this has finished without unlocking, so remembered devices never see it flash.
+(async () => {
+  try {
+    let skip = false; try { skip = sessionStorage.getItem('pd-skip-auto') === '1'; sessionStorage.removeItem('pd-skip-auto'); } catch {}
+    if (skip) return;
+    const rec = await recallDevice(); if (!rec) return;
+    try {
+      const env = await fetchEnvelope(); if (!env || env.salt !== rec.salt) return;
+      S.loadedIv = env.iv;
+      enter(await decryptWithKey(env, rec.key), { key: rec.key, salt: rec.salt, iter: rec.iter }, 'Unlocked');
+    } catch { await forgetDevice(); }
+  } finally {
+    if ($('app').hidden) { $('lock').hidden = false; $('pass').focus(); }
+  }
+})();
 
 // ---------- import ----------
 const drop = $('drop');
@@ -206,10 +260,13 @@ $('btn-save').addEventListener('click', async () => {
   try {
     validateDocument(S.doc);
     $('save-msg').textContent = 'Encrypting…';
-    const env = await encryptDocument(S.doc, S.pass);
+    const env = await encryptWithKey(S.doc, S.session);
+    $('save-msg').textContent = 'Checking GitHub for newer changes…';
+    const cur = await getRepoFile({ owner, repo, path: 'data/portfolio.enc.json', token, ref: branch });
+    if (cur && S.loadedIv) { let ivNow = null; try { ivNow = JSON.parse(cur.text).iv; } catch {} if (ivNow && ivNow !== S.loadedIv) { const e = new Error('changed'); e.conflict = true; throw e; } }
     $('save-msg').textContent = 'Writing to GitHub…';
-    const r = await putRepoFile({ owner, repo, path: 'data/portfolio.enc.json', token, branch, text: JSON.stringify(env), expectedSha: S.sha, message: 'Update encrypted portfolio document' });
-    S.sha = r.sha;
+    const r = await putRepoFile({ owner, repo, path: 'data/portfolio.enc.json', token, branch, text: JSON.stringify(env), expectedSha: cur?.sha, message: 'Update encrypted portfolio document' });
+    S.sha = r.sha; S.loadedIv = env.iv;
     $('save-msg').textContent = `Saved. Commit ${r.commit.slice(0, 7)}. Pages redeploys in a minute or two.`;
   } catch (e) {
     if (e.conflict) $('save-msg').textContent = 'Conflict: the file changed on GitHub since you loaded it. Reload the page, unlock, and re-apply your changes.';
@@ -219,7 +276,7 @@ $('btn-save').addEventListener('click', async () => {
 $('btn-download').addEventListener('click', async () => {
   if (!S.doc) return;
   validateDocument(S.doc);
-  const env = await encryptDocument(S.doc, S.pass);
+  const env = await encryptWithKey(S.doc, S.session);
   download('portfolio.enc.json', JSON.stringify(env), 'application/json');
   $('save-msg').textContent = 'Downloaded. Commit it to data/portfolio.enc.json yourself.';
 });
@@ -290,4 +347,4 @@ function renderLog() {
 
 // ---------- utils ----------
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); URL.revokeObjectURL(a.href); }
-window.addEventListener('beforeunload', () => { S.doc = null; S.pass = ''; });
+window.addEventListener('beforeunload', () => { S.doc = null; S.session = null; });

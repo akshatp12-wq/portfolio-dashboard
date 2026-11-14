@@ -48,6 +48,9 @@ const KIND_RULES = [
   [/interest/i, 'interest']
 ];
 
+export const KINDS = new Set(['', 'manual', 'simulation', ...KIND_RULES.map((r) => r[1])]);
+export const FLAGS = new Set(['REVIEW', 'MANUAL', 'SIM']);
+
 export function classifyNote(note) {
   const flags = [];
   if (/REVIEW/.test(note)) flags.push('REVIEW');

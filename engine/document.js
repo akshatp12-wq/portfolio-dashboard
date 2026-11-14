@@ -1,3 +1,4 @@
+import { KINDS, FLAGS } from './scrub.js';
 // The single encrypted document: shape, defaults, and validation.
 export const DOC_VERSION = 1;
 
@@ -28,6 +29,14 @@ export function validateDocument(doc) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) throw new Error(`Bad date ${t.date}`);
   }
   const ids = new Set(doc.accounts.map((a) => a.id));
+  // Value-level guard: every stored string must come from a closed shape, so free text cannot ride along.
+  for (const t of doc.transactions) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) throw new Error(`Transaction ${t.id}: bad date`);
+    if (t.ticker !== '' && !/^[A-Z][A-Z0-9.\-]{0,9}$/.test(t.ticker)) throw new Error(`Transaction ${t.id}: ticker is not a plain symbol`);
+    if (!KINDS.has(t.kind)) throw new Error(`Transaction ${t.id}: unknown kind`);
+    if (!Array.isArray(t.flags) || t.flags.some((f) => !FLAGS.has(f))) throw new Error(`Transaction ${t.id}: unknown flag`);
+  }
+  for (const a of doc.accounts) if (!/^(Taxable|Tax-deferred|Tax-free|HSA) [A-Z]$/.test(a.label)) throw new Error(`Account ${a.id}: label must be a generic label`);
   for (const t of doc.transactions) if (!ids.has(t.account)) throw new Error(`Transaction ${t.id} references unknown account ${t.account}`);
   for (const s of doc.simulations || []) {
     for (const k of Object.keys(s)) if (!SIM_FIELDS.has(k)) throw new Error(`Unexpected simulation field ${k}`);

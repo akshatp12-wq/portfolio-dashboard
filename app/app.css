@@ -62,3 +62,12 @@ details summary { cursor: pointer; color: var(--muted); min-height: 44px; displa
 @media (max-width: 600px) { .bars li { grid-template-columns: 110px 1fr 56px; } }
 
 input.box { width: 18px; height: 18px; min-width: 0; min-height: 0; }
+
+.lock { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 10; padding: 16px; }
+.lock[hidden] { display: none; }
+.lock-card { width: min(380px, 100%); display: grid; gap: 12px; background: var(--card, #fff); border: 1px solid var(--line, #ddd); border-radius: 14px; padding: 24px; }
+.lock-card h1 { margin: 0; font-size: 1.4rem; }
+.lock-card input[type=password] { width: 100%; }
+.linkbtn { background: none; border: 0; color: var(--muted, #667); text-decoration: underline; cursor: pointer; padding: 0 8px; font: inherit; }
+
+[hidden] { display: none !important; }
