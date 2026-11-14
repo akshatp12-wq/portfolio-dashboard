@@ -367,7 +367,7 @@ async function renderOverview() {
       if (i.ticker === CASH) {
         const pts = []; for (let m = 0; m <= 12; m++) { const dt = addDays(to, -30.4 * m | 0); const stM = endingState(sim.transactions.filter((t) => t.account === i.account && t.date <= dt)); pts.push((stM.cash[i.account] || 0) + (d.overrides.openingCash?.[i.account] || 0)); }
         const avg = pts.reduce((x, y) => x + y, 0) / pts.length;
-        i.base = avg > 0 ? avg : null;
+        i.base = avg >= 500 ? avg : null;   // yield on a few dollars of cash is noise
         continue;
       }
       const divs = S.quotes.tickers[i.ticker]?.dividends;
