@@ -35,11 +35,13 @@ jobs:
           echo "job=${J:-all}" >> "$GITHUB_OUTPUT"
       - name: Quotes
         if: contains(fromJSON('["quotes","all"]'), steps.pick.outputs.job)
-        env: { SCREENER_UNIVERSE_URL: ${{ vars.SCREENER_UNIVERSE_URL }} }
+        env:
+          SCREENER_UNIVERSE_URL: ${{ vars.SCREENER_UNIVERSE_URL }}
         run: python jobs/refresh_quotes.py
       - name: Macro
         if: contains(fromJSON('["macro","all"]'), steps.pick.outputs.job)
-        env: { FRED_API_KEY: ${{ secrets.FRED_API_KEY }} }
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python jobs/refresh_macro.py
         continue-on-error: true
       - name: Fama-French
