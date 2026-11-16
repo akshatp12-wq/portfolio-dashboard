@@ -19,6 +19,9 @@ import { initTrade, fillTradeScopes, renderTrade } from './trade.js';
 import { withSimulations } from '../engine/simulate.js';
 import { buildLots, unrealized } from '../engine/lots.js';
 import { groupPositions, sortRows, CASH } from '../engine/positions.js';
+import { presetWindow, compound } from '../engine/metrics.js';
+import { yearsBetween } from '../engine/dates.js';
+import { valueChart } from './chart.js';
 import { initRefresh, showAsOf } from './refresh.js';
 import { resetQuotes, loadQuoteIndex } from './quotes.js';
 initAssess();
@@ -308,7 +311,7 @@ function fillScopes() {
 }
 ['ov-scope', 'ov-bench', 'ov-sim'].forEach((id) => $(id).addEventListener('change', renderOverview));
 async function renderOverview() {
-  const d = S.doc; const k = $('ov-kpis'); k.innerHTML = '';
+  const d = S.doc;
   if (!d) return;
   const unquoted = await ensureQuotes(neededTickers(d));
   { // keep the benchmark list in sync with mixes added on the Assess tab
@@ -328,14 +331,8 @@ async function renderOverview() {
   const benchKey = $('ov-bench').value;
   const bench = simulateBenchmark({ series, priceBook: pb, mix: allBenchmarks()[benchKey] || BUILT_IN_BENCHMARKS.VOO });
   const bt = twr(bench.series);
-  const deposits = series.reduce((s, p) => s + p.flow, 0);
-  const kpi = (l, v, s = '') => k.insertAdjacentHTML('beforeend', `<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="muted">${s}</span></div>`);
-  kpi('Total value' + (sim.applied.length ? ' (with simulations)' : ''), '$' + fmt(last.value), `cash $${fmt(last.cash)} · holdings $${fmt(last.holdingsValue)}`);
-  kpi('Time-weighted return', pct(t.total), t.annualized != null ? `${pct(t.annualized)} annualized` : 'under 1 year');
-  const benchName = (allBenchmarks()[benchKey] || BUILT_IN_BENCHMARKS.VOO).name;
-  kpi(`Excess vs ${esc(benchName)}`, bench.missing.length ? '—' : pct(t.total - bt.total), bench.missing.length ? `no prices for ${bench.missing.join(', ')}` : `${benchKey} ${pct(bt.total)} on the same flows`);
-  kpi('Money-weighted (XIRR)', pct(x), 'secondary metric');
-  kpi('Net external flows', '$' + fmt(deposits), `${series[0].date} to ${to}`);
+  S.ov = { series, t, bt, x, benchName: ((n) => (/\(([^)]+)\)/.exec(n) || [null, n])[1])((allBenchmarks()[benchKey] || BUILT_IN_BENCHMARKS.VOO).name), benchMissing: bench.missing, simOn: sim.applied.length > 0 };
+  renderHero();
   {
     const { lots } = buildLots(sim.transactions, { openingCostBasis: d.overrides.openingCostBasis, openingDates: d.overrides.openingDates || {} });
     const rows = unrealized(lots, pb, to).filter((u) => accounts.includes(u.account) && u.shares > 1e-9)
@@ -379,24 +376,73 @@ async function renderOverview() {
     const noPx = rows.filter((u) => u.priceMissing).length;
     $('ov-pos-total').textContent = noPx ? `${noPx} position(s) without a price yet; they count as zero until the refresh finishes.` : '';
   }
-  $('ov-note').textContent = S.quotes.asOf ? `Quotes as of ${S.quotes.asOf}.${unquoted.length ? ' No quote file for: ' + unquoted.join(', ') + '.' : ''}` : 'No quote files yet, so holdings are valued only where manual prices exist. Run the refresh workflow once.';
+  $('ov-note').textContent = S.quotes.asOf ? '' : 'No prices have been loaded yet, so holdings show as zero. Press Refresh at the top.';
 }
 
-// ---------- positions table views ----------
-let posView = 'type', posSort = { key: null, dir: 'desc' };
+// ---------- overview: hero ----------
+let ovRange = 'ALL';
+try { ovRange = localStorage.getItem('pd-range') || 'ALL'; } catch {}
+$('ov-range').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-range]'); if (!b) return;
+  ovRange = b.dataset.range; try { localStorage.setItem('pd-range', ovRange); } catch {}
+  renderHero();
+});
+const usd = (n) => (n == null || !Number.isFinite(n) ? '—' : (n < 0 ? '-$' : '$') + Math.round(Math.abs(n)).toLocaleString('en-US'));
+const move = (x, d = 1) => (x == null || !Number.isFinite(x) ? '<span class="muted">—</span>' : Math.abs(x) < 0.0005 ? `<span class="flat">0.0%</span>` : `<span class="${x < 0 ? 'neg' : 'pos'}">${x < 0 ? '▼' : '▲'} ${(Math.abs(x) * 100).toFixed(d)}%</span>`);
+function renderHero() {
+  const o = S.ov; if (!o) return;
+  document.querySelectorAll('#ov-range [data-range]').forEach((b) => b.classList.toggle('on', b.dataset.range === ovRange));
+  const { series } = o; const last = series[series.length - 1], first = series[0].date;
+  const [from] = presetWindow(ovRange, last.date, first);
+  const all = ovRange === 'ALL' || from <= first; const start = all ? first : from;
+  let cum = 0; const pts = series.map((p) => ({ date: p.date, value: p.value, put: (cum += p.flow) }));
+  const win = pts.filter((p) => p.date >= start);
+  const before = all ? null : pts.filter((p) => p.date < start).pop();
+  const gain = (last.value - (before?.value || 0)) - (pts[pts.length - 1].put - (before?.put || 0));
+  const inWin = (d) => d.date >= start;
+  const ret = compound(o.t.daily.filter(inWin)), bret = compound(o.bt.daily.filter(inWin));
+  const yrs = yearsBetween(start, last.date);
+  const perYear = yrs >= 1 ? Math.pow(1 + ret, 1 / yrs) - 1 : null;
+  const span = { '1M': 'in the past month', '3M': 'in the past 3 months', YTD: 'this year', '1Y': 'in the past year', ALL: 'since you started' }[all ? 'ALL' : ovRange];
+  $('ov-hero-label').textContent = 'Total value' + (o.simOn ? ', including simulated trades' : '');
+  $('ov-value').textContent = usd(last.value);
+  const putAll = pts[pts.length - 1].put, putWin = putAll - (before?.put || 0);
+  const tail = all ? `, on ${usd(putAll)} put in` : Math.abs(putWin) >= 1 ? `. You ${putWin < 0 ? 'took out' : 'added'} ${usd(Math.abs(putWin))} in that time` : '';
+  $('ov-sub').innerHTML = `<span class="${gain < 0 ? 'neg' : 'pos'}">${gain < 0 ? '▼' : '▲'} ${usd(Math.abs(gain))}</span> ${gain < 0 ? 'lost' : 'gained'} ${span}${tail}`;
+  const diff = ret - bret;
+  const stat = (l, v, sub, tip = '') => `<div class="stat"${tip ? ` title="${esc(tip)}"` : ''}><span class="l">${l}</span><span class="v">${v}</span><span class="muted">${sub}</span></div>`;
+  let html = stat('Your return', move(ret), perYear != null ? `${pct(perYear, 1)} a year` : span, 'Ignores when you deposited, so it compares fairly with an index.');
+  html += stat(`${esc(o.benchName)}, same deposits`, o.benchMissing.length ? '—' : move(bret), o.benchMissing.length ? 'no prices yet' : Math.abs(diff) < 0.0005 ? 'you are level with it' : `you are ${(Math.abs(diff) * 100).toFixed(1)} points ${diff < 0 ? 'behind' : 'ahead'}`, 'What this index fund would have returned with your exact deposit dates.');
+  if (all && o.x != null) html += stat('On your dollars', `${pct(o.x, 1)} <small>a year</small>`, 'counts when you deposited', 'Money-weighted return: recent large deposits have had less time to grow.');
+  html += stat('Cash', usd(last.cash), `${pct(last.value ? last.cash / last.value : 0, 1)} of the total, not invested`);
+  $('ov-kpis').innerHTML = html;
+  valueChart($('ov-chart'), win);
+}
+
+let rsz; window.addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(renderHero, 150); });
+
+// ---------- overview: allocation ribbon and holdings list ----------
+let posView = 'type', posSort = { key: 'value', dir: 'desc' }, posFocus = null, posInit = false;
+const posOpen = new Set(), posShut = new Set();
 try { posView = localStorage.getItem('pd-pos-view') || 'type'; const r = localStorage.getItem('pd-tax-rate'); if (r != null) $('ov-taxrate').value = r; } catch {}
 $('ov-taxrate').addEventListener('input', () => { try { localStorage.setItem('pd-tax-rate', $('ov-taxrate').value); } catch {} renderPositions(); });
-$('ov-positions').addEventListener('click', (e) => {
-  const th = e.target.closest('th[data-sort]'); if (!th) return;
-  const k = th.dataset.sort;
-  posSort = posSort.key === k ? { key: k, dir: posSort.dir === 'desc' ? 'asc' : 'desc' } : { key: k, dir: ['label', 'sub'].includes(k) ? 'asc' : 'desc' };
-  renderPositions();
-});
 $('ov-view').addEventListener('click', (e) => {
   const b = e.target.closest('[data-view]'); if (!b) return;
-  posView = b.dataset.view; try { localStorage.setItem('pd-pos-view', posView); } catch {}
+  posView = b.dataset.view; posFocus = null; try { localStorage.setItem('pd-pos-view', posView); } catch {}
   renderPositions();
 });
+$('ov-sort').addEventListener('change', () => { const [key, dir] = $('ov-sort').value.split(':'); posSort = { key, dir }; renderPositions(); });
+$('ov-legend').addEventListener('click', (e) => { const b = e.target.closest('[data-focus]'); if (!b) return; posFocus = posFocus === b.dataset.focus ? null : b.dataset.focus; if (posFocus) posShut.delete(posFocus); renderPositions(); });
+$('ov-positions').addEventListener('click', (e) => {
+  const h = e.target.closest('[data-sortkey]');
+  if (h) { const k = h.dataset.sortkey; posSort = posSort.key === k ? { key: k, dir: posSort.dir === 'desc' ? 'asc' : 'desc' } : { key: k, dir: k === 'label' ? 'asc' : 'desc' }; renderPositions(); return; }
+  const g = e.target.closest('[data-group]');
+  if (g) { const k = g.dataset.group; if (posShut.has(k)) posShut.delete(k); else posShut.add(k); renderPositions(); return; }
+  const r = e.target.closest('[data-row]');
+  if (r) { const k = r.dataset.row; if (posOpen.has(k)) posOpen.delete(k); else posOpen.add(k); renderPositions(); }
+});
+const RIBBON = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `var(--r${i})`);   // themed in app.css
+const sharesText = (n) => Number(n.toFixed(4)).toLocaleString('en-US', { maximumFractionDigits: 4 });
 function renderPositions() {
   document.querySelectorAll('#ov-view [data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === posView));
   if (!S.doc) return;
@@ -405,29 +451,59 @@ function renderPositions() {
   // estimated tax only where income is taxed now (taxable accounts); withheld tax always counts
   const items = (S.posItems || []).map((i) => ({ ...i, taxes: (i.withheld || 0) + (typeOf(i.account) === 'taxable' ? rate * Math.max(0, i.income || 0) : 0) }));
   const { sections, total } = groupPositions(items, posView, typeOf, labelOf);
-  if (posSort.key) sections.forEach((sec) => sortRows(sec.rows, posSort.key, posSort.dir));
-  const first = { type: 'Holding', security: 'Security', detail: 'Holding' }[posView];
-  const second = { type: 'Account', security: 'Funds included', detail: 'Account' }[posView];
-  const cols = [['label', first], ['sub', second], ['shares', 'Shares', 'r'], ['price', 'Price', 'r'], ['value', 'Market value', 'r'], ['valuePct', '% of value', 'r'], ['cost', 'Cost basis', 'r'], ['costPct', '% of cost', 'r'], ['gain', 'Gain/(loss)', 'r'], ['gainPct', 'Gain %', 'r'], ['cagr', 'Annualized', 'r'], ['netPct', 'Net income %', 'r']];
+  sections.forEach((sec) => sortRows(sec.rows, posSort.key, posSort.dir));
+  const opt = [...$('ov-sort').options].find((o) => o.value === `${posSort.key}:${posSort.dir}`); if (opt) $('ov-sort').value = opt.value;
+  const grouped = sections.some((s) => s.label);
+  if (grouped && !posInit) { posInit = true; if (window.matchMedia('(max-width: 720px)').matches) sections.forEach((s) => posShut.add(s.label)); }
+  const share = (x) => (total.value > 0 && x != null ? x / total.value : null);
+
+  // ribbon: one bar for the whole portfolio; the legend carries dollars and percent
+  let segs = grouped ? sections.map((s) => ({ label: s.label, value: s.total.value, focus: s.label }))
+    : [...sections[0].rows].sort((a, b) => (b.value || 0) - (a.value || 0)).map((r) => ({ label: r.label, value: r.value, cash: r.tickers[0] === CASH && r.tickers.length === 1 }));
+  segs = segs.filter((x) => x.value > 0);
+  if (segs.length > 7) { const rest = segs.slice(6); segs = [...segs.slice(0, 6), { label: `${rest.length} smaller holdings`, value: rest.reduce((a, x) => a + x.value, 0), other: true }]; }
+  const sum = segs.reduce((a, x) => a + x.value, 0) || 1;
+  let ci = 0; segs.forEach((x) => { x.color = x.cash ? 'var(--cash)' : x.other ? 'var(--other)' : RIBBON[ci++ % RIBBON.length]; });
+  $('ov-ribbon').innerHTML = segs.map((x) => `<span style="flex:${(x.value / sum).toFixed(4)} 1 0;background:${x.color}"${posFocus && x.focus !== posFocus ? ' class="dim"' : ''} title="${esc(x.label)} ${usd(x.value)}"></span>`).join('');
+  $('ov-legend').innerHTML = segs.map((x) => { const inner = `<i style="background:${x.color}"></i><span class="n">${esc(x.label)}</span><span class="a">${usd(x.value)}</span><span class="p">${pct(x.value / sum, 1)}</span>`; return x.focus ? `<li><button type="button" data-focus="${esc(x.focus)}" aria-pressed="${posFocus === x.focus}">${inner}</button></li>` : `<li><div>${inner}</div></li>`; }).join('');
+
+  // holdings list
   const arrow = (k) => (posSort.key === k ? (posSort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-  $('ov-positions').querySelector('thead').innerHTML = `<tr>${cols.map(([k, t, c]) => `<th data-sort="${k}" class="sortable${c ? ' ' + c : ''}" aria-sort="${posSort.key === k ? (posSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">${t}${arrow(k)}</th>`).join('')}</tr>`;
-  const share = (x, t) => (t > 0 && x != null ? pct(x / t, 1) : '—');
-  const signed = (x) => (x == null ? '—' : `<span class="${x < 0 ? 'neg' : 'pos'}">${pct(x, 1)}</span>`);
-  const cells = (r, strong = false) => {
-    const w = (x) => (strong ? `<strong>${x}</strong>` : x);
-    const ann = r.cagr != null ? signed(r.cagr) : r.gainPct != null ? '<span class="muted" title="Held under a year on a cost-weighted basis">&lt;1 yr</span>' : '—';
-    const tip = `TTM income $${fmt(r.income)} · tax $${fmt(r.taxes)} · fees $${fmt(r.fees)} · fund expenses $${fmt(r.expense)}`;
-    return `<td class="r">${r.shares == null ? '' : fmt(r.shares, 4)}</td><td class="r">${r.price == null ? '' : fmt(r.price)}</td><td class="r">${w('$' + fmt(r.value))}${r.priceMissing ? ' <span class="tag">no price</span>' : ''}</td><td class="r">${w(share(r.value, total.value))}</td><td class="r">${r.basisMissing ? 'missing' : w('$' + fmt(r.cost))}</td><td class="r">${r.basisMissing ? '—' : w(share(r.cost, total.cost))}</td><td class="r">${r.gain == null ? '—' : w(fmt(r.gain))}</td><td class="r">${signed(r.gainPct)}</td><td class="r">${ann}</td><td class="r" title="${tip}">${r.netPct == null ? '—' : pct(r.netPct, 2)}</td>`;
+  const head = [['label', posView === 'security' ? 'Security' : 'Holding', ''], ['value', 'Value', 'r'], ['valuePct', 'Share', 'r c-share'], ['gainPct', 'Gain', 'r'], ['cagr', 'Per year', 'r c-wide'], ['netPct', 'Income', 'r c-wide']];
+  let html = `<div class="hrow hhead">${head.map(([k, t, c]) => `<button type="button" class="hc ${c}" data-sortkey="${k}">${t}${arrow(k)}</button>`).join('')}</div>`;
+  const cellsOf = (r) => {
+    const sh = share(r.value);
+    const yr = r.cagr != null ? move(r.cagr) : r.gainPct != null ? '<span class="muted" title="Invested for under a year on average">&lt;1 yr</span>' : '<span class="muted">—</span>';
+    return `<span class="hc r v">${usd(r.value)}${r.priceMissing ? ' <span class="tag">no price</span>' : ''}</span>
+      <span class="hc r c-share"><span class="pbar"><i style="width:${Math.max(0, Math.min(100, (sh || 0) * 100)).toFixed(1)}%"></i></span>${sh == null ? '—' : pct(sh, 1)}</span>
+      <span class="hc r g">${r.basisMissing ? '<span class="muted">no cost</span>' : move(r.gainPct)}${r.gain != null && r.gainPct != null ? `<small>${r.gain < 0 ? '-' : '+'}${usd(Math.abs(r.gain))}</small>` : ''}</span>
+      <span class="hc r c-wide">${yr}</span>
+      <span class="hc r c-wide">${r.netPct == null ? '<span class="muted">—</span>' : pct(r.netPct, 2)}</span>`;
   };
-  let html = '';
+  const detail = (r) => {
+    const f = (l, v) => `<div><dt>${l}</dt><dd>${v}</dd></div>`;
+    return `<dl class="hdetail">
+      ${r.shares != null ? f('Shares', sharesText(r.shares)) + f('Price', '$' + fmt(r.price)) : ''}
+      ${f('Cost basis', r.basisMissing ? 'missing' : '$' + fmt(r.cost))}${f('Share of total cost', r.basisMissing || !total.cost ? '—' : pct(r.cost / total.cost, 1))}
+      ${f('Gain in dollars', r.gain == null ? '—' : (r.gain < 0 ? '-$' : '$') + fmt(Math.abs(r.gain)))}${f('Gain per year', r.cagr != null ? pct(r.cagr, 1) : r.gainPct != null ? `under a year held (${r.years.toFixed(1)} yr)` : '—')}
+      ${f('Income, last 12 months', '$' + fmt(r.income))}${f('Less tax, fees, fund costs', '$' + fmt(r.taxes + r.fees + r.expense))}${f('Net income', r.netPct == null ? '—' : `$${fmt(r.net)} (${pct(r.netPct, 2)})`)}
+      ${r.accounts > 1 ? f('Held in', `${r.accounts} accounts`) : ''}
+    </dl>`;
+  };
   for (const sec of sections) {
-    if (sec.label) html += `<tr class="sec"><td colspan="12">${esc(sec.label)}</td></tr>`;
-    for (const r of sec.rows) html += `<tr><td>${esc(r.label)}</td><td class="muted">${esc(r.sub)}</td>${cells(r)}</tr>`;
-    if (sec.total) html += `<tr class="sub"><td colspan="2">${esc(sec.label)} subtotal</td>${cells(sec.total, true)}</tr>`;
+    if (posFocus && sec.label !== posFocus) continue;
+    const shut = sec.label && posShut.has(sec.label);
+    if (sec.label) html += `<button type="button" class="hrow hgroup" data-group="${esc(sec.label)}" aria-expanded="${!shut}"><span class="hc"><span class="chev">${shut ? '▸' : '▾'}</span><span class="gn">${esc(sec.label)}</span><small>${sec.rows.length} ${sec.rows.length === 1 ? 'line' : 'lines'}</small></span>${cellsOf(sec.total)}</button>`;
+    if (shut) continue;
+    for (const r of sec.rows) {
+      const key = `${sec.label || ''}|${r.label}|${r.sub}`; const open = posOpen.has(key);
+      html += `<button type="button" class="hrow hitem${sec.label ? ' in' : ''}" data-row="${esc(key)}" aria-expanded="${open}"><span class="hc"><span class="nm">${esc(r.label)}</span><small>${esc(r.sub)}</small></span>${cellsOf(r)}</button>${open ? detail(r) : ''}`;
+    }
   }
-  $('ov-positions').querySelector('tbody').innerHTML = html;
   const n = items.filter((i) => i.ticker !== CASH).length;
-  $('ov-positions').querySelector('tfoot').innerHTML = items.length ? `<tr class="total"><td colspan="2"><strong>Total (${n} positions + cash)</strong></td>${cells(total, true)}</tr>` : '';
+  if (!posFocus) html += `<div class="hrow htotal"><span class="hc">Total<small>${n} positions and cash</small></span>${cellsOf(total)}</div>`;
+  else html += `<p class="muted small focusnote">Showing ${esc(posFocus)} only. Tap it again in the legend above to show everything.</p>`;
+  $('ov-positions').innerHTML = html;
 }
 
 // ---------- log ----------

@@ -11,19 +11,23 @@
 </head>
 <body>
 <header class="top" id="topbar" hidden>
-  <div class="brand">
-    <button id="btn-refresh" class="refresh" type="button" title="Refresh stock prices and macro data">&#8635; Refresh data</button>
-    <div class="rf"><span id="rf-status" class="muted" role="status"></span><div id="rf-bar" class="rf-bar" hidden><div></div></div></div>
-    <span class="title">Portfolio</span><span class="muted" id="status">Locked</span><button id="btn-lock" class="linkbtn" type="button">Lock</button>
+  <div class="top-in">
+    <span class="title">Portfolio</span>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab active" data-tab="overview"><span class="ico" aria-hidden="true">&#9673;</span>Overview</button>
+      <button class="tab" data-tab="assess"><span class="ico" aria-hidden="true">&#9699;</span>Analysis</button>
+      <button class="tab" data-tab="macro"><span class="ico" aria-hidden="true">&#9728;</span>Economy</button>
+      <button class="tab" data-tab="trade"><span class="ico" aria-hidden="true">&#65291;</span>Trade</button>
+      <button class="tab" data-tab="log"><span class="ico" aria-hidden="true">&#9776;</span>Activity</button>
+      <button class="tab" data-tab="data"><span class="ico" aria-hidden="true">&#9881;</span>Settings</button>
+    </nav>
+    <div class="top-tools">
+      <div class="rf"><span id="rf-status" class="muted" role="status"></span><div id="rf-bar" class="rf-bar" hidden><div></div></div></div>
+      <button id="btn-refresh" class="iconbtn" type="button" title="Refresh stock prices and economy data" aria-label="Refresh prices and economy data">&#8635;<span class="lbl">Refresh</span></button>
+      <button id="btn-lock" class="iconbtn" type="button" title="Lock" aria-label="Lock">&#128274;&#xFE0E;<span class="lbl">Lock</span></button>
+      <span id="status" hidden>Locked</span>
+    </div>
   </div>
-  <nav class="tabs" aria-label="Sections">
-    <button class="tab active" data-tab="overview">Overview</button>
-    <button class="tab" data-tab="assess">Assess</button>
-    <button class="tab" data-tab="macro">Macro</button>
-    <button class="tab" data-tab="trade">Trade</button>
-    <button class="tab" data-tab="log">Log</button>
-    <button class="tab" data-tab="data">Data</button>
-  </nav>
 </header>
 
 <div id="lock" class="lock" hidden>
@@ -142,27 +146,72 @@
 
 <!-- ============ OVERVIEW (phase 1 minimal) ============ -->
 <section id="tab-overview" class="tabpane">
-  <div class="card">
-    <h2>Overview</h2>
-    <p class="muted" id="ov-note">Unlock a document first. Prices come from <code>data/quotes/</code>, refreshed by the scheduled job; until it runs, values use manual prices only.</p>
-    <div class="row">
-      <label>Accounts <select id="ov-scope"></select></label>
-      <label>Benchmark <select id="ov-bench"></select></label>
-      <label class="chk"><input type="checkbox" id="ov-sim"> Include simulations</label>
+
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <p class="hero-label" id="ov-hero-label">Total value</p>
+        <p class="hero-value" id="ov-value">—</p>
+        <p class="hero-sub" id="ov-sub"></p>
+      </div>
+      <div class="chips" id="ov-range" role="group" aria-label="Time range">
+        <button type="button" data-range="1M">1M</button>
+        <button type="button" data-range="3M">3M</button>
+        <button type="button" data-range="YTD">YTD</button>
+        <button type="button" data-range="1Y">1Y</button>
+        <button type="button" data-range="ALL" class="on">All</button>
+      </div>
     </div>
-    <div class="kpis" id="ov-kpis"></div>
+    <div class="stats" id="ov-kpis"></div>
+    <div id="ov-chart" class="chart"></div>
+    <p class="muted small" id="ov-note"></p>
+  </div>
+
+  <div class="card">
     <div class="pos-head">
-      <h3>Open positions</h3>
-      <div class="seg" id="ov-view" role="group" aria-label="Group positions">
+      <h2>Where it sits</h2>
+      <div class="seg" id="ov-view" role="group" aria-label="Group holdings">
         <button type="button" data-view="type">By account type</button>
         <button type="button" data-view="security">By security</button>
-        <button type="button" data-view="detail">Detail</button>
+        <button type="button" data-view="detail">By account</button>
       </div>
-      <label class="inline">Tax on taxable-account income <input id="ov-taxrate" inputmode="decimal" value="15" size="3">%</label>
     </div>
-    <div class="scroll"><table id="ov-positions"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+    <div id="ov-ribbon" class="ribbon" role="img" aria-label="Allocation"></div>
+    <ul id="ov-legend" class="ribbon-legend"></ul>
+  </div>
+
+  <div class="card">
+    <div class="pos-head">
+      <h2>Holdings</h2>
+      <label class="inline sortsel">Sort by
+        <select id="ov-sort">
+          <option value="value:desc">Largest first</option>
+          <option value="gainPct:desc">Biggest gain %</option>
+          <option value="gainPct:asc">Biggest loss %</option>
+          <option value="gain:desc">Most dollars gained</option>
+          <option value="cagr:desc">Best yearly return</option>
+          <option value="netPct:desc">Highest income</option>
+          <option value="label:asc">Name A to Z</option>
+        </select>
+      </label>
+    </div>
+    <div id="ov-positions" class="hold"></div>
     <p class="muted" id="ov-pos-total"></p>
-    <p class="muted small">Gain % is on cost basis, price only. Annualized is the gain compounded over the cost-weighted holding period (shown once that is at least a year). Net income % is trailing-12-month dividends and interest, minus tax at the rate above for taxable accounts, account fees (split by value) and fund expense ratios, divided by market value. Click a column to sort.</p>
+    <details class="opts">
+      <summary>View options and how these numbers are calculated</summary>
+      <div class="row">
+        <label>Accounts <select id="ov-scope"></select></label>
+        <label>Compare against <select id="ov-bench"></select></label>
+        <label class="inline">Tax rate on income in taxable accounts <input id="ov-taxrate" inputmode="decimal" value="15" size="3">%</label>
+        <label class="chk"><input type="checkbox" id="ov-sim"> Include simulated trades</label>
+      </div>
+      <ul class="plain muted small">
+        <li><strong>Gain</strong> is today's value minus what you paid (price only, before dividends).</li>
+        <li><strong>Per year</strong> is that gain compounded over how long the money has been invested, weighted by cost. It appears once that is at least a year.</li>
+        <li><strong>Income</strong> is the last 12 months of dividends per share on the shares you hold now (interest for cash), minus tax at the rate above in taxable accounts, account fees and fund expenses, as a share of value.</li>
+        <li><strong>Return</strong> at the top ignores the timing of your deposits, so it compares fairly with an index. <strong>S&amp;P 500, same deposits</strong> is what an index fund would have returned with your exact deposit dates.</li>
+      </ul>
+    </details>
   </div>
 </section>
 
@@ -250,6 +299,7 @@
 </section>
 
 </main>
+<div class="navspace" aria-hidden="true"></div>
 <footer class="muted">Everything on this page runs in your browser. Not investment advice.</footer>
 <script type="module" src="app/app.js"></script>
 </body>

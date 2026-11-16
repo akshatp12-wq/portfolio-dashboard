@@ -21,7 +21,7 @@ export function initRefresh({ done }) {
 export function showAsOf() {
   const q = S.quotes.asOf ? new Date(S.quotes.asOf) : null, m = S.macro?.asOf ? new Date(S.macro.asOf) : null;
   const f = (d) => d && !isNaN(d) ? d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never';
-  if (!running) $('rf-status').textContent = `Prices ${f(q)} · Macro ${f(m)}`;
+  if (!running) { $('rf-status').textContent = `Prices updated ${f(q)}`; $('rf-status').title = `Economy data updated ${f(m)}`; }
 }
 
 function repo() {
